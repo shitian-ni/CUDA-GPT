@@ -3,6 +3,8 @@
 #include <math.h>
 #include <time.h>
 #include<iostream>
+#include<map>
+#include<string.h>
 
 using namespace std;
 
@@ -25,6 +27,9 @@ using namespace std;
 #define MAX_BRIGHTNESS 255
 #define MAX_FILENAME 256
 #define NoDIRECTION 20
+#define G_NUM 27
+#define COLH COL*162
+#define COLHt COL*27
 
 double varTable[6] = {1.0 / 32, 1.0 / 16.0, 1.0 / 8.0, 1.0 / 4.0, 1.0 / 2.0, 1.0};
 double H[ROW][COL * 162], Ht[ROW][COL * 27];
@@ -81,14 +86,90 @@ __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, d
     d_Ht[y*27 * COL + x] = d_H[y* 162*COL+x + COL * 27 * count] + (d_H[y* 162*COL+x + COL * 27 * (count + 1)] - d_H[y * 162*COL+x + COL * 27 * count]) / (d_varTable[count + 1] - d_varTable[count]) * (newVar - d_varTable[count]);
 };
 
+__global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, double* d_g) {
+    int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+    if ((y1 >= ROW) || (x1 >= COL)) {
+        return;
+    }
+    double dx1, dy1;
+
+    dy1 = y1 - CY;
+	dx1 = x1 - CX;
+
+	int thre = (d_g_ang1[y1*COL + x1] + 1) * 3 * COL;
+
+	double t0     = d_Ht[y1*COLHt + thre + x1]           * d_g_can1[y1*COL + x1];
+	double tx2    = d_Ht[y1*COLHt + thre + x1 + COL]     * d_g_can1[y1*COL + x1];
+	double ty2    = d_Ht[y1*COLHt + thre + x1 + COL * 2] * d_g_can1[y1*COL + x1];
+
+	atomicAdd(&d_g[0]        , t0);
+	atomicAdd(&d_g[21]       , tx2);
+	atomicAdd(&d_g[22]       , ty2);
+	atomicAdd(&d_g[3]     , t0  * dx1);
+	atomicAdd(&d_g[4]     , t0  * dx1 * dx1);
+	atomicAdd(&d_g[5]     , t0  * dx1 * dx1 * dx1);
+	atomicAdd(&d_g[6]     , t0  * dx1 * dx1 * dx1 * dx1);
+	atomicAdd(&d_g[7]     , t0  * dy1);
+	atomicAdd(&d_g[8]     , t0  * dy1 * dy1);
+	atomicAdd(&d_g[9]     , t0  * dy1 * dy1 * dy1);
+	atomicAdd(&d_g[10]     , t0  * dy1 * dy1 * dy1 * dy1);
+	atomicAdd(&d_g[11] , t0  * dx1 * dy1);
+	atomicAdd(&d_g[12] , t0  * dx1 * dx1 * dy1);
+	atomicAdd(&d_g[13] , t0  * dx1 * dx1 * dx1 * dy1);
+	atomicAdd(&d_g[14] , t0  * dx1 * dy1 * dy1);
+	atomicAdd(&d_g[15] , t0  * dx1 * dx1 * dy1 * dy1);
+	atomicAdd(&d_g[16] , t0  * dx1 * dy1 * dy1 * dy1);
+	atomicAdd(&d_g[17]     , tx2 * dx1);
+	atomicAdd(&d_g[18]     , tx2 * dy1);
+	atomicAdd(&d_g[19]     , ty2 * dx1);
+	atomicAdd(&d_g[20]     , ty2 * dy1);
+	atomicAdd(&d_g[23]   , tx2 * dx1 * dx1);
+	atomicAdd(&d_g[24]   , ty2 * dx1 * dy1);
+	atomicAdd(&d_g[25]   , tx2 * dx1 * dy1);
+	atomicAdd(&d_g[26]   , ty2 * dy1 * dy1);
+};
+
+#define g0 g[0]
+#define gx1 g[1]
+#define gy1 g[2]
+#define gx1p1 g[3]
+#define gx1p2 g[4]
+#define gx1p3 g[5]
+#define gx1p4 g[6]
+#define gy1p1 g[7]
+#define gy1p2 g[8]
+#define gy1p3 g[9]
+#define gy1p4 g[10]
+#define gx1p1y1p1 g[11]
+#define gx1p2y1p1 g[12]
+#define gx1p3y1p1 g[13]
+#define gx1p1y1p2 g[14]
+#define gx1p2y1p2 g[15]
+#define gx1p1y1p3 g[16]
+#define gx1x2 g[17]
+#define gy1x2 g[18]
+#define gx1y2 g[19]
+#define gy1y2 g[20]
+#define gx2 g[21]
+#define gy2 g[22]
+#define gx1p2x2 g[23]
+#define gx1y1y2 g[24]
+#define gx1y1x2 g[25]
+#define gy1p2y2 g[26]
+
 int main(){
-	clock_t begin = clock();
+	clock_t begin, end, m_begin, m_end;
+	double elapsed_secs=0, m_elapsed_secs=0;
+	begin = clock();
 	
 	int image3[ROW2][COL2], image4[ROW][COL];					
 	int x1, y1, x2, y2, x, y, thre, count;
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+
+	// double g0, gx1, gy1, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+
+
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;
@@ -109,12 +190,17 @@ int main(){
 	double* d_Ht;
 	double* d_varTable;
 
+	m_begin = clock();
+
 	cudaMalloc(&d_H, ROW*162*COL*sizeof(double));
 	cudaMalloc(&d_Ht, ROW*27*COL*sizeof(double));
 	cudaMalloc(&d_varTable, 6*sizeof(double));
 
 	cudaMemcpy(d_H, H, ROW*162*COL*sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_varTable, varTable, 6*sizeof(double), cudaMemcpyHostToDevice);
+
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 
 	dim3 numBlock(iDivUp(27 * COL , TPB), iDivUp(ROW, TPB));
 	dim3 numThread(TPB,TPB);
@@ -133,52 +219,31 @@ int main(){
 
     // (cudaDeviceSynchronize());
 
-	g0 = gx2 = gy2 = 0.0;
-	gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
-	gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
-	gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
-	gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
-	for (y1 = MARGINE ; y1 < ROW - MARGINE ; y1++) {
-		dy1 = y1 - CY;
-		for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
-			dx1 = x1 - CX;
+	double g[G_NUM];
+	memset(g,0,sizeof(g));
+	double* d_g;
+	int* d_g_ang1;
+	double* d_g_can1;
 
-			thre = (g_ang1[y1][x1] + 1) * 3 * COL;
+	m_begin = clock();
 
-			t0     = Ht[y1][thre + x1]           * g_can1[y1][x1];
-			tx2    = Ht[y1][thre + x1 + COL]     * g_can1[y1][x1];
-			ty2    = Ht[y1][thre + x1 + COL * 2] * g_can1[y1][x1];
+	cudaMalloc(&d_g, G_NUM*sizeof(double));
+	cudaMalloc(&d_g_ang1, ROW * COL * sizeof(int));
+	cudaMalloc(&d_g_can1, ROW * COL * sizeof(double));
+	cudaMemset(d_g, 0, G_NUM * sizeof(double));
+	cudaMemcpy(d_g_ang1, g_ang1, ROW * COL *sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_g_can1, g_can1, ROW * COL *sizeof(double), cudaMemcpyHostToDevice);
 
-			g0        += t0;
-			gx2       += tx2;
-			gy2       += ty2;
-			gx1p1     += t0  * dx1;
-			gx1p2     += t0  * dx1 * dx1;
-			gx1p3     += t0  * dx1 * dx1 * dx1;
-			gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
-			gy1p1     += t0  * dy1;
-			gy1p2     += t0  * dy1 * dy1;
-			gy1p3     += t0  * dy1 * dy1 * dy1;
-			gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
-			gx1p1y1p1 += t0  * dx1 * dy1;
-			gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
-			gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
-			gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
-			gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
-			gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
-			gx1x2     += tx2 * dx1;
-			gy1x2     += tx2 * dy1;
-			gx1y2     += ty2 * dx1;
-			gy1y2     += ty2 * dy1;
-			gx1p2x2   += tx2 * dx1 * dx1;
-			gx1y1y2   += ty2 * dx1 * dy1;
-			gx1y1x2   += tx2 * dx1 * dy1;
-			gy1p2y2   += ty2 * dy1 * dy1;
-		}
-	}
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
+
+	weightedAVG<<<numBlock, numThread>>>(d_Ht, d_g_can1, d_g_ang1, d_g);
+
+	cudaMemcpy(g, d_g, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
 	
-	clock_t end = clock();
-  	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC * 1000;
+	end = clock();
+  	elapsed_secs = double(end - begin) / CLOCKS_PER_SEC * 1000;
+  	printf("Time elapsed in calculation: %.7f ms\n",elapsed_secs-m_elapsed_secs);
   	printf("Time elapsed in total: %.7f ms\n",elapsed_secs);
 
 	printf("g0 = %f\n", g0);
