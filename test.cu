@@ -66,7 +66,9 @@ __global__ void Ht_1(double *d_Ht, double *d_H) {
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
+    // printf("1 d_H  %d %d %.5f\n",x,y,d_H[y* 162*COL+x]);
     d_Ht[y * 27 * COL+x] =  d_H[y* 162 * COL+x + COL * 27 * 5];
+    // printf("1 d_Ht: %d %d %.5f\n",x,y,d_Ht[y* 27*COL+x]);
 };
 __global__ void Ht_2(double *d_Ht, double *d_H) {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -74,7 +76,7 @@ __global__ void Ht_2(double *d_Ht, double *d_H) {
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
-    printf("%d %d %.5f\n",x,y,d_H[y* 162*COL+x]);
+    // printf("2 %d %d %.5f\n",x,y,d_H[y* 162*COL+x]);
     d_Ht[y*27* COL+x] =  d_H[y* 162*COL+x];
 };
 __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, double newVar) {
@@ -84,6 +86,7 @@ __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, d
         return;
     }
     d_Ht[y*27 * COL + x] = d_H[y* 162*COL+x + COL * 27 * count] + (d_H[y* 162*COL+x + COL * 27 * (count + 1)] - d_H[y * 162*COL+x + COL * 27 * count]) / (d_varTable[count + 1] - d_varTable[count]) * (newVar - d_varTable[count]);
+    // printf("3 d_Ht: %d %d %.5f\n",x,y,d_Ht[y* 27*COL+x]);
 };
 
 __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, double* d_g) {
@@ -162,6 +165,12 @@ int main(){
 	clock_t begin, end, m_begin, m_end;
 	double elapsed_secs=0, m_elapsed_secs=0;
 	begin = clock();
+
+	cudaStream_t s1,s2,s3;
+	cudaStreamCreate(&s1); cudaStreamCreate(&s2); cudaStreamCreate(&s3);
+
+	cudaEvent_t event1,event2,event3;
+ 	cudaEventCreate (&event1); cudaEventCreate (&event2); cudaEventCreate (&event3);
 	
 	int image3[ROW2][COL2], image4[ROW][COL];					
 	int x1, y1, x2, y2, x, y, thre, count;
@@ -193,11 +202,18 @@ int main(){
 	m_begin = clock();
 
 	cudaMalloc(&d_H, ROW*162*COL*sizeof(double));
-	cudaMalloc(&d_Ht, ROW*27*COL*sizeof(double));
-	cudaMalloc(&d_varTable, 6*sizeof(double));
+	cudaMallocHost(&d_Ht, ROW*27*COL*sizeof(double));
+	cudaMallocHost(&d_varTable, 6*sizeof(double));
 
 	cudaMemcpy(d_H, H, ROW*162*COL*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_varTable, varTable, 6*sizeof(double), cudaMemcpyHostToDevice);
+	// cudaEventRecord (event1, s1);
+	cudaMemcpyAsync(d_varTable, varTable, 6*sizeof(double), cudaMemcpyHostToDevice,s2);
+	// cudaEventRecord (event2, s2);
+
+	// cudaDeviceSynchronize();
+
+	// cudaStreamWaitEvent ( 0, event1,0 );
+	// cudaStreamWaitEvent ( 0, event2,0 );
 
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
@@ -214,10 +230,21 @@ int main(){
 		Ht_3<<<numBlock, numThread>>>(d_Ht, d_H, d_varTable, count, newVar);
 	}
 	(cudaPeekAtLastError());
+	// cudaDeviceSynchronize();
     // (cudaDeviceSynchronize());
-	cudaMemcpy(Ht, d_Ht, ROW*27*COL*sizeof(double), cudaMemcpyDeviceToHost);
+    m_begin = clock();
+	cudaMemcpyAsync(Ht, d_Ht, ROW*27*COL*sizeof(double), cudaMemcpyDeviceToHost);
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
+	// cudaDeviceSynchronize();
+	// for(int i=0;i<ROW;i++){
+	// 	for(int j=0;j<COLHt;j++){
+	// 		cout<<Ht[i][j]<<" ";
+	// 	}
+	// 	cout<<endl;
+	// }
 
-    // (cudaDeviceSynchronize());
+    // ();
 
 	double g[G_NUM];
 	memset(g,0,sizeof(g));
@@ -227,19 +254,22 @@ int main(){
 
 	m_begin = clock();
 
-	cudaMalloc(&d_g, G_NUM*sizeof(double));
-	cudaMalloc(&d_g_ang1, ROW * COL * sizeof(int));
-	cudaMalloc(&d_g_can1, ROW * COL * sizeof(double));
-	cudaMemset(d_g, 0, G_NUM * sizeof(double));
-	cudaMemcpy(d_g_ang1, g_ang1, ROW * COL *sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_g_can1, g_can1, ROW * COL *sizeof(double), cudaMemcpyHostToDevice);
+	cudaMallocHost(&d_g, G_NUM*sizeof(double));
+	cudaMallocHost(&d_g_ang1, ROW * COL * sizeof(int));
+	cudaMallocHost(&d_g_can1, ROW * COL * sizeof(double));
+	cudaMemsetAsync(d_g, 0, G_NUM * sizeof(double),s1);
+	cudaMemcpyAsync(d_g_ang1, g_ang1, ROW * COL *sizeof(int), cudaMemcpyHostToDevice,s2);
+	cudaMemcpyAsync(d_g_can1, g_can1, ROW * COL *sizeof(double), cudaMemcpyHostToDevice,s3);
 
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 
 	weightedAVG<<<numBlock, numThread>>>(d_Ht, d_g_can1, d_g_ang1, d_g);
 
+	m_begin = clock();
 	cudaMemcpy(g, d_g, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 	
 	end = clock();
   	elapsed_secs = double(end - begin) / CLOCKS_PER_SEC * 1000;
