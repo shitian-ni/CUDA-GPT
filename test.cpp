@@ -32,9 +32,14 @@ unsigned char image2[1024][1024];
 int x_size1 = COL, y_size1 = ROW; /* width & height of image1*/
 int x_size2, y_size2; /* width & height of image2 */
 
+#define __1000times 0
 
 int main(){
 	clock_t begin = clock();
+
+	#if __1000times == 1
+	for(int tcase=0;tcase<1000;tcase++){
+	#endif
 
 	int image3[ROW2][COL2], image4[ROW][COL];					
 	int x1, y1, x2, y2, x, y, thre, count;
@@ -130,12 +135,19 @@ int main(){
 			gy1p2y2   += ty2 * dy1 * dy1;
 		}
 	}
-	
+
+	#if __1000times == 1
+	}
+	#endif
+
 	clock_t end = clock();
   	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC * 1000;
   	printf("Time elapsed in total: %.7f ms\n",elapsed_secs);
   	
+  	#if __1000times == 0
 	printf("g0 = %f\n", g0);
+	#endif
+	
 	
 	return 0;
 }

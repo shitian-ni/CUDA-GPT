@@ -74,7 +74,7 @@ __global__ void Ht_2(double *d_Ht, double *d_H) {
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
-    printf("%d %d %.5f\n",x,y,d_H[y* 162*COL+x]);
+    // printf("%d %d %.5f\n",x,y,d_H[y* 162*COL+x]);
     d_Ht[y*27* COL+x] =  d_H[y* 162*COL+x];
 };
 __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, double newVar) {
@@ -89,7 +89,7 @@ __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, d
 #define ROW_X_COL ROW*COL
 
 
-	// //atomicAdd to shared_memory 
+	// // //atomicAdd to shared_memory  bad, 1000 times 1400~1500ms
 	// __device__ void customAdd(double* g_idata,double* g_odata,int g_i){
 	// 	__shared__ double shared[ROW_X_COL];
 	// 	int x1 = blockIdx.x*blockDim.x + threadIdx.x;
@@ -107,7 +107,7 @@ __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, d
 	//     __syncthreads();
 	// }
 
-
+//1000 times 1200~1300ms
 //http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/reduction/doc/reduction.pdf
 __device__ void customAdd(double* g_idata,double* g_odata, int g_i){
 	__shared__ double sdata[ROW_X_COL];
@@ -121,24 +121,23 @@ __device__ void customAdd(double* g_idata,double* g_odata, int g_i){
     __syncthreads();
  
 	// do reduction in shared mem
-	for (unsigned int s=1; s < ROW_X_COL; s *= 2) {
-		int index = 2 * s * tid;
-		if (index < ROW_X_COL) {
-			sdata[index] += sdata[index + s];
-		}
-		__syncthreads();
+	if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads();
+	if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads();
+	if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads();
+	if (tid < 64) { sdata[tid] += sdata[tid + 64]; } __syncthreads();
+	if (tid < 32){
+		sdata[tid] += sdata[tid + 32];__syncthreads();
+		sdata[tid] += sdata[tid + 16];__syncthreads();
+		sdata[tid] += sdata[tid + 8];__syncthreads();
+		sdata[tid] += sdata[tid + 4];__syncthreads();
+		sdata[tid] += sdata[tid + 2];__syncthreads();
+		sdata[tid] += sdata[tid + 1];__syncthreads();
 	}
-	// for (unsigned int s=ROW_X_COL/2; s>0; s>>=1) {
-	// 	if (tid < s) {
-	// 	sdata[tid] += sdata[tid + s];
-	// 	}
-	// 	__syncthreads();
-	// 	}
+
 	// write result for this block to global mem
 	if (tid == 0) atomicAdd(&g_odata[g_i]        , sdata[tid]);
 
 
-    __syncthreads();
 }
 
 __device__ double data_to_sum[G_NUM][ROW_X_COL];
@@ -220,11 +219,17 @@ __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, doubl
 #define gx1y1x2 g[25]
 #define gy1p2y2 g[26]
 
+#define __1000times 0
+
 int main(){
 	clock_t begin, end, m_begin, m_end;
 	double elapsed_secs=0, m_elapsed_secs=0;
 	begin = clock();
-	
+
+	#if __1000times == 1
+	for(int tcase=0;tcase<1000;tcase++){
+	#endif
+
 	int image3[ROW2][COL2], image4[ROW][COL];					
 	int x1, y1, x2, y2, x, y, thre, count;
 
@@ -302,13 +307,21 @@ int main(){
 	weightedAVG<<<numBlock, numThread>>>(d_Ht, d_g_can1, d_g_ang1, d_g);
 
 	cudaMemcpy(g, d_g, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
+
+	#if __1000times == 1
+	}
+	#endif
+	
 	
 	end = clock();
   	elapsed_secs = double(end - begin) / CLOCKS_PER_SEC * 1000;
   	printf("Time elapsed in calculation: %.7f ms\n",elapsed_secs-m_elapsed_secs);
   	printf("Time elapsed in total: %.7f ms\n",elapsed_secs);
 
+  	#if __1000times == 0
 	printf("g0 = %f\n", g0);
+	#endif
+
 	return 0;
 }
 
