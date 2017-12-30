@@ -86,6 +86,62 @@ __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, d
     d_Ht[y*27 * COL + x] = d_H[y* 162*COL+x + COL * 27 * count] + (d_H[y* 162*COL+x + COL * 27 * (count + 1)] - d_H[y * 162*COL+x + COL * 27 * count]) / (d_varTable[count + 1] - d_varTable[count]) * (newVar - d_varTable[count]);
 };
 
+#define ROW_X_COL ROW*COL
+
+/*
+	//atomicAdd to shared_memory 
+	__device__ void customAdd(double* g_idata,double* g_odata){
+		__shared__ double shared[ROW_X_COL];
+		int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+	    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+	    int id = y1*COL+x1;
+	    int tx = threadIdx.x;
+	    int ty = threadIdx.y;
+	    int tid = ty * blockDim.x + tx;
+	    shared[tid] = g_idata[id];
+	    __syncthreads();
+	 
+
+	    atomicAdd(&g_odata[0]        , shared[tid]);
+
+	    __syncthreads();
+	}
+*/
+
+//http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/reduction/doc/reduction.pdf
+__device__ void customAdd(double* g_idata,double* g_odata){
+	__shared__ double sdata[ROW_X_COL];
+	int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+    int id = y1*COL+x1;
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int tid = ty * blockDim.x + tx;
+    sdata[tid] = g_idata[id];
+    __syncthreads();
+ 
+	// do reduction in shared mem
+	// for (unsigned int s=1; s < ROW_X_COL; s *= 2) {
+	// 	int index = 2 * s * tid;
+	// 	if (index < ROW_X_COL) {
+	// 		sdata[index] += sdata[index + s];
+	// 	}
+	// 	__syncthreads();
+	// }
+	for (unsigned int s=ROW_X_COL/2; s>0; s>>=1) {
+		if (tid < s) {
+		sdata[tid] += sdata[tid + s];
+		}
+		__syncthreads();
+		}
+	// write result for this block to global mem
+	if (tid == 0) atomicAdd(&g_odata[0]        , sdata[tid]);
+
+
+    __syncthreads();
+}
+
+__device__ double data_to_sum[ROW_X_COL];
 __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, double* d_g) {
     int x1 = blockIdx.x*blockDim.x + threadIdx.x;
     int y1 = blockIdx.y*blockDim.y + threadIdx.y;
@@ -103,31 +159,35 @@ __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, doubl
 	double tx2    = d_Ht[y1*COLHt + thre + x1 + COL]     * d_g_can1[y1*COL + x1];
 	double ty2    = d_Ht[y1*COLHt + thre + x1 + COL * 2] * d_g_can1[y1*COL + x1];
 
-	atomicAdd(&d_g[0]        , t0);
-	atomicAdd(&d_g[21]       , tx2);
-	atomicAdd(&d_g[22]       , ty2);
-	atomicAdd(&d_g[3]     , t0  * dx1);
-	atomicAdd(&d_g[4]     , t0  * dx1 * dx1);
-	atomicAdd(&d_g[5]     , t0  * dx1 * dx1 * dx1);
-	atomicAdd(&d_g[6]     , t0  * dx1 * dx1 * dx1 * dx1);
-	atomicAdd(&d_g[7]     , t0  * dy1);
-	atomicAdd(&d_g[8]     , t0  * dy1 * dy1);
-	atomicAdd(&d_g[9]     , t0  * dy1 * dy1 * dy1);
-	atomicAdd(&d_g[10]     , t0  * dy1 * dy1 * dy1 * dy1);
-	atomicAdd(&d_g[11] , t0  * dx1 * dy1);
-	atomicAdd(&d_g[12] , t0  * dx1 * dx1 * dy1);
-	atomicAdd(&d_g[13] , t0  * dx1 * dx1 * dx1 * dy1);
-	atomicAdd(&d_g[14] , t0  * dx1 * dy1 * dy1);
-	atomicAdd(&d_g[15] , t0  * dx1 * dx1 * dy1 * dy1);
-	atomicAdd(&d_g[16] , t0  * dx1 * dy1 * dy1 * dy1);
-	atomicAdd(&d_g[17]     , tx2 * dx1);
-	atomicAdd(&d_g[18]     , tx2 * dy1);
-	atomicAdd(&d_g[19]     , ty2 * dx1);
-	atomicAdd(&d_g[20]     , ty2 * dy1);
-	atomicAdd(&d_g[23]   , tx2 * dx1 * dx1);
-	atomicAdd(&d_g[24]   , ty2 * dx1 * dy1);
-	atomicAdd(&d_g[25]   , tx2 * dx1 * dy1);
-	atomicAdd(&d_g[26]   , ty2 * dy1 * dy1);
+	
+	data_to_sum[y1*COL+x1]=t0;
+	__syncthreads();
+	customAdd(data_to_sum,d_g);
+	// atomicAdd(&d_g[0]        , t0);
+	// atomicAdd(&d_g[21]       , tx2);
+	// atomicAdd(&d_g[22]       , ty2);
+	// atomicAdd(&d_g[3]     , t0  * dx1);
+	// atomicAdd(&d_g[4]     , t0  * dx1 * dx1);
+	// atomicAdd(&d_g[5]     , t0  * dx1 * dx1 * dx1);
+	// atomicAdd(&d_g[6]     , t0  * dx1 * dx1 * dx1 * dx1);
+	// atomicAdd(&d_g[7]     , t0  * dy1);
+	// atomicAdd(&d_g[8]     , t0  * dy1 * dy1);
+	// atomicAdd(&d_g[9]     , t0  * dy1 * dy1 * dy1);
+	// atomicAdd(&d_g[10]     , t0  * dy1 * dy1 * dy1 * dy1);
+	// atomicAdd(&d_g[11] , t0  * dx1 * dy1);
+	// atomicAdd(&d_g[12] , t0  * dx1 * dx1 * dy1);
+	// atomicAdd(&d_g[13] , t0  * dx1 * dx1 * dx1 * dy1);
+	// atomicAdd(&d_g[14] , t0  * dx1 * dy1 * dy1);
+	// atomicAdd(&d_g[15] , t0  * dx1 * dx1 * dy1 * dy1);
+	// atomicAdd(&d_g[16] , t0  * dx1 * dy1 * dy1 * dy1);
+	// atomicAdd(&d_g[17]     , tx2 * dx1);
+	// atomicAdd(&d_g[18]     , tx2 * dy1);
+	// atomicAdd(&d_g[19]     , ty2 * dx1);
+	// atomicAdd(&d_g[20]     , ty2 * dy1);
+	// atomicAdd(&d_g[23]   , tx2 * dx1 * dx1);
+	// atomicAdd(&d_g[24]   , ty2 * dx1 * dy1);
+	// atomicAdd(&d_g[25]   , tx2 * dx1 * dy1);
+	// atomicAdd(&d_g[26]   , ty2 * dy1 * dy1);
 };
 
 #define g0 g[0]
