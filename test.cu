@@ -297,7 +297,13 @@ __global__ void weightedAVG() {
 #define __1000times 0
 
 int main(){
+	clock_t begin, end, m_begin, m_end;
+	double elapsed_secs=0, m_elapsed_secs=0;
+	begin = clock();
+
+
 	//Get CUDA global memory pointers
+	m_begin = clock();
 	void* d_H_ptr;void*  d_Ht_ptr;void*  d_varTable_ptr;void*  d_g_ptr;void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;
 	cudaGetSymbolAddress(&d_H_ptr,d_H);
 	cudaGetSymbolAddress(&d_Ht_ptr,d_Ht);
@@ -306,10 +312,9 @@ int main(){
 	cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1);
 	cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1);
 	cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1);
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 
-	clock_t begin, end, m_begin, m_end;
-	double elapsed_secs=0, m_elapsed_secs=0;
-	begin = clock();
 
 	#if __1000times == 1
 	for(int tcase=0;tcase<1000;tcase++){
