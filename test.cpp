@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include<iostream>
+
+using namespace std;
 
 #define ROW 64
 #define COL 64
@@ -192,6 +195,7 @@ void roberts8(int g_ang[ROW][COL], double g_nor[ROW][COL]) {
 				else if (angle > -7.0 / 8.0 * PI) g_ang[y][x] = 6;
 				else g_ang[y][x] = 5;
 			}
+			// printf("%d %d %d\n",y,x,g_ang[y][x]);
 			//printf("(%d, %d) ang = %d,  norm = %f\n", x, y, g_ang[y][x], g_nor[y][x]);
 		}
 	}
@@ -211,13 +215,20 @@ void defcan(double g_can[ROW][COL]) {
 			norm += (double)image1[y][x] * (double)image1[y][x];
 		}
 	}
+	//158086 2.20739e+07
+	// cout<<mean<<" "<<norm<<endl;
 	mean /= (double)npo;
 	norm -= (double)npo * mean * mean;
 	if (norm == 0.0) norm = 1.0;
+	//38.5952 1.59725e+07
+	//cout<<mean<<" "<<norm<<endl;
 	ratio = 1.0 / sqrt(norm);
 	for (y = 0 ; y < ROW; y++) {
 		for (x = 0 ; x < COL; x++) {
 			g_can[y][x] = ratio * ((double)image1[y][x] - mean);
+			//0.00025 -0.00966
+			// printf("%.5f %.5f\n",ratio,g_can[y][x]);
+
 		}
 	}
 }
