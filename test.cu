@@ -32,7 +32,8 @@ using namespace std;
 #define COLHt COL*27
 
 double varTable[6] = {1.0 / 32, 1.0 / 16.0, 1.0 / 8.0, 1.0 / 4.0, 1.0 / 2.0, 1.0};
-double H[ROW][COL * 162], Ht[ROW][COL * 27];
+double H[ROW][COLH], Ht[ROW][COLHt];
+__device__ double d_H[ROW][COLH], d_Ht[ROW][COLHt];
 
 void load_image_data( ); /* image input */
 void save_image_data( ); /* image output*/
@@ -43,6 +44,11 @@ void roberts8(int g_ang[ROW][COL], double g_nor[ROW][COL]);
 
 unsigned char image1[1024][1024];
 unsigned char image2[1024][1024];
+__device__ unsigned char d_image1[1024][1024];
+__device__ unsigned char d_image2[1024][1024];
+__device__ double d_varTable[6], d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL];
+__device__ int d_g_ang1[ROW][COL];
+
 int x_size1 = COL, y_size1 = ROW; /* width & height of image1*/
 int x_size2, y_size2; /* width & height of image2 */
 
@@ -60,30 +66,30 @@ void read_H(){
 
 int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
 
-__global__ void Ht_1(double *d_Ht, double *d_H) {
+__global__ void Ht_1() {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
-    d_Ht[y * 27 * COL+x] =  d_H[y* 162 * COL+x + COL * 27 * 5];
+    d_Ht[y][x] =  d_H[y][x + COL * 27 * 5];
 };
-__global__ void Ht_2(double *d_Ht, double *d_H) {
+__global__ void Ht_2() {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
     // printf("%d %d %.5f\n",x,y,d_H[y* 162*COL+x]);
-    d_Ht[y*27* COL+x] =  d_H[y* 162*COL+x];
+    d_Ht[y][x] =  d_H[y][x];
 };
-__global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, double newVar) {
+__global__ void Ht_3(int count, double newVar) {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
-    d_Ht[y*27 * COL + x] = d_H[y* 162*COL+x + COL * 27 * count] + (d_H[y* 162*COL+x + COL * 27 * (count + 1)] - d_H[y * 162*COL+x + COL * 27 * count]) / (d_varTable[count + 1] - d_varTable[count]) * (newVar - d_varTable[count]);
+    d_Ht[y][x] = d_H[y][x + COL * 27 * count] + (d_H[y][x + COL * 27 * (count + 1)] - d_H[y][x + COL * 27 * count]) / (d_varTable[count + 1] - d_varTable[count]) * (newVar - d_varTable[count]);
 };
 
 #define ROW_X_COL ROW*COL
@@ -109,7 +115,7 @@ __global__ void Ht_3(double *d_Ht, double *d_H, double* d_varTable, int count, d
 
 //1000 times 1200~1300ms
 //http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/reduction/doc/reduction.pdf
-__device__ void customAdd(double* g_idata,double* g_odata, int g_i){
+__device__ void weightedAVG_customAdd(double* g_idata,double* g_odata, int g_i){
 	__shared__ double sdata[ROW_X_COL];
 	int x1 = blockIdx.x*blockDim.x + threadIdx.x;
     int y1 = blockIdx.y*blockDim.y + threadIdx.y;
@@ -141,7 +147,7 @@ __device__ void customAdd(double* g_idata,double* g_odata, int g_i){
 }
 
 __device__ double data_to_sum[G_NUM][ROW_X_COL];
-__global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, double* d_g) {
+__global__ void weightedAVG() {
     int x1 = blockIdx.x*blockDim.x + threadIdx.x;
     int y1 = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y1 >= ROW) || (x1 >= COL)) {
@@ -152,11 +158,11 @@ __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, doubl
     dy1 = y1 - CY;
 	dx1 = x1 - CX;
 
-	int thre = (d_g_ang1[y1*COL + x1] + 1) * 3 * COL;
+	int thre = (d_g_ang1[y1][x1] + 1) * 3 * COL;
 
-	double t0     = d_Ht[y1*COLHt + thre + x1]           * d_g_can1[y1*COL + x1];
-	double tx2    = d_Ht[y1*COLHt + thre + x1 + COL]     * d_g_can1[y1*COL + x1];
-	double ty2    = d_Ht[y1*COLHt + thre + x1 + COL * 2] * d_g_can1[y1*COL + x1];
+	double t0     = d_Ht[y1][thre + x1]           * d_g_can1[y1][x1];
+	double tx2    = d_Ht[y1][thre + x1 + COL]     * d_g_can1[y1][x1];
+	double ty2    = d_Ht[y1][thre + x1 + COL * 2] * d_g_can1[y1][x1];
 	
 	data_to_sum[0][y1*COL+x1]=t0;
 	data_to_sum[21][y1*COL+x1]=tx2;
@@ -187,9 +193,78 @@ __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, doubl
 	__syncthreads();
 
 	for(int i=0;i<G_NUM;i++){
-		customAdd(data_to_sum[i],d_g,i);
+		weightedAVG_customAdd(data_to_sum[i],d_g,i);
 	}
 };
+
+// __global__ void cuda_roberts8() {
+// 	/* extraction of gradient information by Roberts operator */
+// 	/* with 8-directional codes and strength */
+// 	double delta_RD, delta_LD;
+// 	double angle;
+// 	int x, y;  /* Loop variable */
+
+// 	/* angle & norm of gradient vector calculated
+//      by Roberts operator */
+// 	for (y = 0; y < ROW; y++) {
+// 		for (x = 0; x < COL; x++) {
+// 			d_g_ang[y][x] = -1;
+// 			d_g_nor[y][x] = 0.0;
+// 		}
+// 	}
+
+// 	for (y = 0; y < ROW - 1; y++) {
+// 		for (x = 0; x < COL - 1; x++) {
+// 			delta_RD = d_image1[y][x + 1] - d_image1[y + 1][x];
+// 			delta_LD = d_image1[y][x]     - d_image1[y + 1][x + 1];
+// 			d_g_nor[y][x] = sqrt(delta_RD * delta_RD + delta_LD * delta_LD);
+
+// 			if (d_g_nor[y][x] == 0.0 || delta_RD * delta_RD + delta_LD * delta_LD < NoDIRECTION * NoDIRECTION) continue;
+
+// 			if (abs(delta_RD) == 0.0) {
+// 				if (delta_LD > 0) d_g_ang[y][x] = 3;
+// 				if (delta_LD < 0) d_g_ang[y][x] = 7;
+// 			} else {
+// 				angle = atan2(delta_LD, delta_RD);
+// 				if (     angle >  7.0 / 8.0 * PI) d_g_ang[y][x] = 5;
+// 				else if (angle >  5.0 / 8.0 * PI) d_g_ang[y][x] = 4;
+// 				else if (angle >  3.0 / 8.0 * PI) d_g_ang[y][x] = 3;
+// 				else if (angle >  1.0 / 8.0 * PI) d_g_ang[y][x] = 2;
+// 				else if (angle > -1.0 / 8.0 * PI) d_g_ang[y][x] = 1;
+// 				else if (angle > -3.0 / 8.0 * PI) d_g_ang[y][x] = 0;
+// 				else if (angle > -5.0 / 8.0 * PI) d_g_ang[y][x] = 7;
+// 				else if (angle > -7.0 / 8.0 * PI) d_g_ang[y][x] = 6;
+// 				else d_g_ang[y][x] = 5;
+// 			}
+// 			//printf("(%d, %d) ang = %d,  norm = %f\n", x, y, g_ang[y][x], g_nor[y][x]);
+// 		}
+// 	}
+// }
+
+// __global__ void cuda_defcan() {
+// 	/* definite canonicalization */
+// 	int x, y;
+// 	double mean, norm, ratio; // mean: mean value, norm: normal factor, ratio:
+// 	int npo; // number of point
+
+// 	npo = (ROW - 2 * MARGINE) * (COL - 2 * MARGINE);
+// 	mean = norm = 0.0;
+// 	for (y = MARGINE ; y < ROW - MARGINE ; y++) {
+// 		for (x = MARGINE ; x < COL - MARGINE ; x++) {
+// 			mean += (double)d_image1[y][x];
+// 			norm += (double)d_image1[y][x] * (double)d_image1[y][x];
+// 		}
+// 	}
+// 	mean /= (double)npo;
+// 	norm -= (double)npo * mean * mean;
+// 	if (norm == 0.0) norm = 1.0;
+// 	ratio = 1.0 / sqrt(norm);
+// 	for (y = 0 ; y < ROW; y++) {
+// 		for (x = 0 ; x < COL; x++) {
+// 			d_g_can[y][x] = ratio * ((double)d_image1[y][x] - mean);
+// 		}
+// 	}
+// }
 
 #define g0 g[0]
 #define gx1 g[1]
@@ -222,6 +297,16 @@ __global__ void weightedAVG(double *d_Ht, double* d_g_can1, int* d_g_ang1, doubl
 #define __1000times 0
 
 int main(){
+	//Get CUDA global memory pointers
+	void* d_H_ptr;void*  d_Ht_ptr;void*  d_varTable_ptr;void*  d_g_ptr;void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;
+	cudaGetSymbolAddress(&d_H_ptr,d_H);
+	cudaGetSymbolAddress(&d_Ht_ptr,d_Ht);
+	cudaGetSymbolAddress(&d_varTable_ptr,d_varTable);
+	cudaGetSymbolAddress(&d_g_ptr,d_g);
+	cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1);
+	cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1);
+	cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1);
+
 	clock_t begin, end, m_begin, m_end;
 	double elapsed_secs=0, m_elapsed_secs=0;
 	begin = clock();
@@ -242,72 +327,70 @@ int main(){
 	double dx1, dx2, dy1, dy2;
 	double g_can1[ROW][COL], g_nor1[ROW][COL];
 	int g_ang1[ROW][COL];
+
+	double g[G_NUM];
+	memset(g,0,sizeof(g));
+
 	double newVar = rand() % 6;
-	
+
 	read_H();
 
 	/* Read image */
 	char fileName[128];
 	sprintf(fileName, "tests0.pgm"); //
 	load_image_file(fileName);
+
+	
+
+	m_begin = clock();
+	cudaMemcpy(d_image1, image1, 1024 * 1024 *sizeof(unsigned char), cudaMemcpyHostToDevice);
+	
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
+
 	defcan(g_can1);
 	roberts8(g_ang1, g_nor1);
 
-	double* d_H;
-	double* d_Ht;
-	double* d_varTable;
-
 	m_begin = clock();
-
-	cudaMalloc(&d_H, ROW*162*COL*sizeof(double));
-	cudaMalloc(&d_Ht, ROW*27*COL*sizeof(double));
-	cudaMalloc(&d_varTable, 6*sizeof(double));
-
-	cudaMemcpy(d_H, H, ROW*162*COL*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_varTable, varTable, 6*sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_H_ptr, H, ROW*162*COL*sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_varTable_ptr, varTable, 6*sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double));
+	cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW * COL *sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_g_can1_ptr, g_can1, ROW * COL *sizeof(double), cudaMemcpyHostToDevice);
 
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
+
+
+	
 
 	dim3 numBlock(iDivUp(27 * COL , TPB), iDivUp(ROW, TPB));
 	dim3 numThread(TPB,TPB);
 
 	if (newVar > 1.0) {
-		Ht_1<<<numBlock, numThread>>>(d_Ht, d_H);
+		Ht_1<<<numBlock, numThread>>>();
 	} else if (newVar < 1.0 / 32.0) {
-		Ht_2<<<numBlock, numThread>>>(d_Ht, d_H);
+		Ht_2<<<numBlock, numThread>>>();
 	} else {
 		int count = floor(log2(newVar)) + 5;
-		Ht_3<<<numBlock, numThread>>>(d_Ht, d_H, d_varTable, count, newVar);
+		Ht_3<<<numBlock, numThread>>>(count, newVar);
 	}
 	(cudaPeekAtLastError());
     // (cudaDeviceSynchronize());
-	cudaMemcpy(Ht, d_Ht, ROW*27*COL*sizeof(double), cudaMemcpyDeviceToHost);
 
-    // (cudaDeviceSynchronize());
-
-	double g[G_NUM];
-	memset(g,0,sizeof(g));
-	double* d_g;
-	int* d_g_ang1;
-	double* d_g_can1;
-
-	m_begin = clock();
-
-	cudaMalloc(&d_g, G_NUM*sizeof(double));
-	cudaMalloc(&d_g_ang1, ROW * COL * sizeof(int));
-	cudaMalloc(&d_g_can1, ROW * COL * sizeof(double));
-	cudaMemset(d_g, 0, G_NUM * sizeof(double));
-	cudaMemcpy(d_g_ang1, g_ang1, ROW * COL *sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_g_can1, g_can1, ROW * COL *sizeof(double), cudaMemcpyHostToDevice);
-
+    m_begin = clock();
+	cudaMemcpy(Ht, d_Ht_ptr, ROW*27*COL*sizeof(double), cudaMemcpyDeviceToHost);
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
+    // (cudaDeviceSynchronize());
 
-	weightedAVG<<<numBlock, numThread>>>(d_Ht, d_g_can1, d_g_ang1, d_g);
+	
 
-	cudaMemcpy(g, d_g, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
-
+	weightedAVG<<<numBlock, numThread>>>();
+	m_begin = clock();
+	cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
+	m_end = clock();
+  	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 	#if __1000times == 1
 	}
 	#endif
