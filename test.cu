@@ -192,30 +192,32 @@ __global__ void cuda_roberts8() {
 
 	__syncthreads();
 
-	if (y<ROW-1 && x<COL-1){
-		delta_RD = d_image1[y][x + 1] - d_image1[y + 1][x];
-		delta_LD = d_image1[y][x]     - d_image1[y + 1][x + 1];
-		d_g_nor1[y][x] = sqrt(delta_RD * delta_RD + delta_LD * delta_LD);
-
-		if (d_g_nor1[y][x] == 0.0 || delta_RD * delta_RD + delta_LD * delta_LD < NoDIRECTION * NoDIRECTION) {}
-		else{
-			if (abs(delta_RD) == 0.0) {
-				if (delta_LD > 0) d_g_ang1[y][x] = 3;
-				if (delta_LD < 0) d_g_ang1[y][x] = 7;
-			} else {
-				angle = atan2(delta_LD, delta_RD);
-				if (     angle >  7.0 / 8.0 * PI) d_g_ang1[y][x] = 5;
-				else if (angle >  5.0 / 8.0 * PI) d_g_ang1[y][x] = 4;
-				else if (angle >  3.0 / 8.0 * PI) d_g_ang1[y][x] = 3;
-				else if (angle >  1.0 / 8.0 * PI) d_g_ang1[y][x] = 2;
-				else if (angle > -1.0 / 8.0 * PI) d_g_ang1[y][x] = 1;
-				else if (angle > -3.0 / 8.0 * PI) d_g_ang1[y][x] = 0;
-				else if (angle > -5.0 / 8.0 * PI) d_g_ang1[y][x] = 7;
-				else if (angle > -7.0 / 8.0 * PI) d_g_ang1[y][x] = 6;
-				else d_g_ang1[y][x] = 5;
-			}
-		}	
+	if(y >= ROW-1 || x >= COL-1){
+		return;
 	}
+
+	delta_RD = d_image1[y][x + 1] - d_image1[y + 1][x];
+	delta_LD = d_image1[y][x]     - d_image1[y + 1][x + 1];
+	d_g_nor1[y][x] = sqrt(delta_RD * delta_RD + delta_LD * delta_LD);
+
+	if (d_g_nor1[y][x] == 0.0 || delta_RD * delta_RD + delta_LD * delta_LD < NoDIRECTION * NoDIRECTION) {
+		return;
+	}
+	if (abs(delta_RD) == 0.0) {
+		if (delta_LD > 0) d_g_ang1[y][x] = 3;
+		if (delta_LD < 0) d_g_ang1[y][x] = 7;
+		return;
+	} 
+	angle = atan2(delta_LD, delta_RD);
+	if (     angle >  7.0 / 8.0 * PI) d_g_ang1[y][x] = 5;
+	else if (angle >  5.0 / 8.0 * PI) d_g_ang1[y][x] = 4;
+	else if (angle >  3.0 / 8.0 * PI) d_g_ang1[y][x] = 3;
+	else if (angle >  1.0 / 8.0 * PI) d_g_ang1[y][x] = 2;
+	else if (angle > -1.0 / 8.0 * PI) d_g_ang1[y][x] = 1;
+	else if (angle > -3.0 / 8.0 * PI) d_g_ang1[y][x] = 0;
+	else if (angle > -5.0 / 8.0 * PI) d_g_ang1[y][x] = 7;
+	else if (angle > -7.0 / 8.0 * PI) d_g_ang1[y][x] = 6;
+	else d_g_ang1[y][x] = 5;	
 }
 
 /*
@@ -246,20 +248,6 @@ __global__ void cuda_defcan1() {
 		customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars,i);
 	}
 }
-// __global__ void cuda_defcan2() {
-// 	int x = blockIdx.x*blockDim.x + threadIdx.x;
-//     int y = blockIdx.y*blockDim.y + threadIdx.y;
-
-//     double ratio; // mean: mean value, norm: normal factor, ratio:
-// 	int npo; // number of point
-// 	npo = (ROW - 2 * MARGINE) * (COL - 2 * MARGINE);
-
-// 	if(x==0 && y == 0){
-// 		d_cuda_defcan_vars[0] /= (double)npo;
-// 		d_cuda_defcan_vars[1] -= (double)npo * d_cuda_defcan_vars[0] * d_cuda_defcan_vars[0];
-// 		if (d_cuda_defcan_vars[1] == 0.0) d_cuda_defcan_vars[1] = 1.0;
-// 	}
-// }
 __global__ void cuda_defcan2() {
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -316,7 +304,7 @@ __global__ void cuda_defcan2() {
 #define gx1y1x2 g[25]
 #define gy1p2y2 g[26]
 
-#define __1000times 1
+#define __1000times 0
 
 int main(){
 
