@@ -26,7 +26,7 @@ using namespace std;
 #define COLH COL*162
 #define COLHt COL*27
 
-double varTable[6] = {1.0 / 32, 1.0 / 16.0, 1.0 / 8.0, 1.0 / 4.0, 1.0 / 2.0, 1.0};
+
 double H[ROW][COLH], Ht[ROW][COLHt];
 
 void load_image_data( ); /* image input */
@@ -40,7 +40,7 @@ unsigned char image2[1024][1024];
 __device__ double d_H[ROW][COLH], d_Ht[ROW][COLHt];
 __device__ unsigned char d_image1[1024][1024];
 __device__ unsigned char d_image2[1024][1024];
-__device__ double d_varTable[6], d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL];
+__device__ double d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL];
 __device__ int d_g_ang1[ROW][COL];
 
 int x_size1 = COL, y_size1 = ROW; /* width & height of image1*/
@@ -84,8 +84,10 @@ __global__ void Ht_3(int count, double newVar) {
     if ((y >= ROW) || (x >= 27 * COL)) {
         return;
     }
-
-    d_Ht[y][x] = d_H[y][x + COL * 27 * count] + (d_H[y][x + COL * 27 * (count + 1)] - d_H[y][x + COL * 27 * count]) / (d_varTable[count + 1] - d_varTable[count]) * (newVar - d_varTable[count]);
+    // double varTable[6] = {1.0 / 32, 1.0 / 16.0, 1.0 / 8.0, 1.0 / 4.0, 1.0 / 2.0, 1.0};
+    double var_p_1 = pow(2.0,count + 1 -5);
+    double var = var_p_1 / 2.0;
+    d_Ht[y][x] = d_H[y][x + COL * 27 * count] + (d_H[y][x + COL * 27 * (count + 1)] - d_H[y][x + COL * 27 * count]) / (var_p_1 - var) * (newVar - var);
 };
 
 #define ROW_X_COL ROW*COL
@@ -187,12 +189,14 @@ __global__ void cuda_roberts8() {
 	/* angle & norm of gradient vector calculated
      by Roberts operator */
 
-	d_g_ang1[y][x] = -1;
-	d_g_nor1[y][x] = 0.0;
+	// d_g_ang1[y][x] = -1;
+	// d_g_nor1[y][x] = 0.0;
 
-	__syncthreads();
+	// __syncthreads();
 
 	if(y >= ROW-1 || x >= COL-1){
+		d_g_ang1[y][x] = -1;
+		d_g_nor1[y][x] = 0.0;
 		return;
 	}
 
@@ -201,11 +205,13 @@ __global__ void cuda_roberts8() {
 	d_g_nor1[y][x] = sqrt(delta_RD * delta_RD + delta_LD * delta_LD);
 
 	if (d_g_nor1[y][x] == 0.0 || delta_RD * delta_RD + delta_LD * delta_LD < NoDIRECTION * NoDIRECTION) {
+		d_g_ang1[y][x] = -1;
 		return;
 	}
 	if (abs(delta_RD) == 0.0) {
 		if (delta_LD > 0) d_g_ang1[y][x] = 3;
-		if (delta_LD < 0) d_g_ang1[y][x] = 7;
+		else if (delta_LD < 0) d_g_ang1[y][x] = 7;
+		else d_g_ang1[y][x] = -1;
 		return;
 	} 
 	angle = atan2(delta_LD, delta_RD);
@@ -304,7 +310,7 @@ __global__ void cuda_defcan2() {
 #define gx1y1x2 g[25]
 #define gy1p2y2 g[26]
 
-#define __1000times 0
+#define __1000times 1
 
 int main(){
 
@@ -318,16 +324,15 @@ int main(){
 
 	//Get CUDA global memory pointers
 	m_begin = clock();
-	void* d_image1_ptr; void* d_image2_ptr; void* d_H_ptr;void*  d_Ht_ptr;void*  d_varTable_ptr;void*  d_g_ptr;void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr; 
+	void* d_image1_ptr; void* d_image2_ptr; void* d_H_ptr;void*  d_Ht_ptr;void*  d_g_ptr;void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr; 
 	cudaGetSymbolAddress(&d_image1_ptr,d_image1);
-	cudaGetSymbolAddress(&d_image2_ptr,d_image2);
+	// cudaGetSymbolAddress(&d_image2_ptr,d_image2);
 	cudaGetSymbolAddress(&d_H_ptr,d_H);
 	cudaGetSymbolAddress(&d_Ht_ptr,d_Ht);
-	cudaGetSymbolAddress(&d_varTable_ptr,d_varTable);
 	cudaGetSymbolAddress(&d_g_ptr,d_g);
-	cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1);
-	cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1);
-	cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1);
+	// cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1);
+	// cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1);
+	// cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1);
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 
@@ -365,14 +370,12 @@ int main(){
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
 
-
 	cuda_defcan1<<<numBlock, numThread>>>();
 	cuda_defcan2<<<numBlock, numThread>>>();
 	cuda_roberts8<<<numBlock, numThread>>>();
 
 	m_begin = clock();
 	cudaMemcpy(d_H_ptr, H, ROW*162*COL*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_varTable_ptr, varTable, 6*sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double));
 	m_end = clock();
   	m_elapsed_secs += double(m_end - m_begin) / CLOCKS_PER_SEC * 1000;
