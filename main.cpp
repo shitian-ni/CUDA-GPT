@@ -1,3 +1,7 @@
+//
+//  Created by Shizhi Zhang on 1/2/18.
+//
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>

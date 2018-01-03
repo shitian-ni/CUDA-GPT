@@ -1,3 +1,7 @@
+//
+//  Created by Shizhi Zhang on 1/2/18.
+//
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -310,7 +314,7 @@ __global__ void cuda_defcan2() {
 #define gx1y1x2 g[25]
 #define gy1p2y2 g[26]
 
-#define __1000times 1
+#define __1000times 0
 
 int main(){
 
