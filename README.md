@@ -15,7 +15,7 @@ Calculate ``` g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y
 ```
 nvcc main.cu -arch=sm_60
 ```
-
+Tested on TSUBAME 3.0
 Manipulate __1000times between 0 and 1 to get execution time and comparison between cpp version and cuda version.
 
 
