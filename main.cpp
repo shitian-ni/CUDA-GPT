@@ -11,6 +11,7 @@
 #include"include/utility.h"
 #include"include/stdGpt.h"
 #include"include/acclGpt.h"
+#include "include/acclGpt_cuda.h"
 
 /* Image storage arrays */
 unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE];
@@ -85,6 +86,9 @@ int main() {
 	/* Load test image and save it to image3, the local memory */
 	sprintf(fileName, "%s/%s.pgm", IMGDIR, TsIMAGE);
 	load_image_file(fileName, image1, COL2, ROW2);
+
+	// cuda_init_parameter(image1);
+
 	for (y = 0; y < ROW2; y++)
 		for (x = 0; x < COL2; x++)
 			image3[y][x] = image1[y][x];
@@ -135,10 +139,13 @@ int main() {
 		break;
 	}
 
+
 	/***************Main iteration loop*************/
 	/* lap the start time */
 	start = clock();
 	for (iter = 0 ; iter < MAXITER ; iter++) {
+
+
 		/* Calculation distance */
 		switch (DISTANCETYPE) {
 		case 0:

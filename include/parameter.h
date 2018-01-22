@@ -33,7 +33,13 @@
  0: use CPU to calculate defcan, roberts8, calHoG, and smpHoG64
  1: use GPU to calculate defcan, roberts8, calHoG, and smpHoG64
  */
-#define isGPU 0
+#define isGPU 1
+
+/* CUDA parameters */
+#define TPB 32
+#define TPB_X_TPB TPB*TPB
+#define G_NUM 27
+
 
 /* switch template table type 
  0: automatical selection of the type of window size
@@ -122,6 +128,9 @@
 #define ROW 136           /* Vertical   size of image  */
 #define COL2 340          /* Horizontal size of image  */
 #define ROW2 272          /* Vertical   size of image  */
+#define ROW_H ROW-4
+#define COL_H ((COL - 4) * 6 * 64 * 3)
+#define COL_Ht ((COL - 4) * 64 * 3)
 #define CX  85
 #define CY  68
 #define CX2  170
@@ -258,5 +267,7 @@
 #define CENTERCORRELATION
 
 #endif
+
+#define ROW_X_COL ROW*COL
 
 #endif // PARAMETER_H

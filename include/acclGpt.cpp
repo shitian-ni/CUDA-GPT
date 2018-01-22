@@ -11,6 +11,7 @@
 #include "utility.h"
 #include "stdGpt.h"
 #include "acclGpt.h"
+#include "acclGpt_cuda.h"
 
 void winTbl(int g_ang2[ROW][COL], double D[ROW][COL * 8], char *fn);
 void winTbl64(char sHoG2[ROW - 4][COL - 4], double D2[ROW - 4][(COL - 4) * 64], char *fn);
@@ -942,94 +943,106 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 	double denom;
 	double dx1, dx2, dy1, dy2;
 	double tGpt1[3][3], tGpt2[3][3];
+    double* g;
 
 	int count = 0;
 	newVar = 1.0 / (WGT * dnn * WGT * dnn);
 
 	/* Linear interpolation */
 
-	if (newVar > 1.0) {
-		for (y = 0 ; y < ROW - 2 * margin ; y++) {
-			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-					Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * 5];
-			}
-		}
-	} else if (newVar < 1.0 / 32.0) {
-		for (y = 0 ; y < ROW - 2 * margin ; y++) {
-			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-					Ht[y][x] =  H[y][x];
-			}
-		}
-	} else {
-		count = floor(log2(newVar)) + 5;
-		for (y = 0 ; y < ROW - 2 * margin ; y++) {
-			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-					Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
-							   (H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - H[y][x + (COL - 2 * margin) * 3 * 64 * count])
-							 / (var[count + 1] - var[count])
-							 * (newVar - var[count]);
-					// printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
-			}
-		}
-	}
+    if(isGPU){
+        cuda_update_parameter(g_ang1, g_can1, H,sHoG1);
+        cuda_Ht(newVar);
+        g = cuda_calc_g();
+        printf("G0: %.5f\n",g[0]);    
+    } else {
+        if (newVar > 1.0) {
+            for (y = 0 ; y < ROW - 2 * margin ; y++) {
+                for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
+                        Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * 5];
+                }
+            }
+        } else if (newVar < 1.0 / 32.0) {
+            for (y = 0 ; y < ROW - 2 * margin ; y++) {
+                for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
+                        Ht[y][x] =  H[y][x];
+                }
+            }
+        } else {
+            count = floor(log2(newVar)) + 5;
+            for (y = 0 ; y < ROW - 2 * margin ; y++) {
+                for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
+                        Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
+                                   (H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - H[y][x + (COL - 2 * margin) * 3 * 64 * count])
+                                 / (var[count + 1] - var[count])
+                                 * (newVar - var[count]);
+                        // printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
+                }
+            }
+        }
 
-	/* Gaussian weigthed mean values */
-	g0 = gx2 = gy2 = 0.0;
-	gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
-	gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
-	gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
-	gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
-	for (y1 = margin ; y1 < ROW - margin ; y1++) {
-		dy1 = y1 - CY;
-		for (x1 = margin ; x1 < COL - margin ; x1++) {
-			dx1 = x1 - CX;
+        /* Gaussian weigthed mean values */
+        g0 = gx2 = gy2 = 0.0;
+        gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
+        gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
+        gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
+        gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
+        for (y1 = margin ; y1 < ROW - margin ; y1++) {
+            dy1 = y1 - CY;
+            for (x1 = margin ; x1 < COL - margin ; x1++) {
+                dx1 = x1 - CX;
 
-			if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
+                if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
 
-			thre = -1;
-			for (s = 0 ; s < 64 ; s++) {
-				if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
-					thre = s * 3 * (COL - 2 * margin);
-					break;
-				}
-			}
-			if (thre == -1) {
-				printf("ERROR! \n");
-			}
+                thre = -1;
+                for (s = 0 ; s < 64 ; s++) {
+                    if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+                        thre = s * 3 * (COL - 2 * margin);
+                        break;
+                    }
+                }
+                if (thre == -1) {
+                    printf("ERROR! \n");
+                }
 
-			t0     = Ht[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
-			tx2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
-			ty2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
+                t0     = Ht[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
+                tx2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
+                ty2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
 
-            // printf("(%d %d) t0 = %f \n", y1, x1, t0);
+                // printf("(%d %d) t0 = %f \n", y1, x1, t0);
 
-			g0        += t0;
-			gx2       += tx2;
-			gy2       += ty2;
-			gx1p1     += t0  * dx1;
-			gx1p2     += t0  * dx1 * dx1;
-			gx1p3     += t0  * dx1 * dx1 * dx1;
-			gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
-			gy1p1     += t0  * dy1;
-			gy1p2     += t0  * dy1 * dy1;
-			gy1p3     += t0  * dy1 * dy1 * dy1;
-			gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
-			gx1p1y1p1 += t0  * dx1 * dy1;
-			gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
-			gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
-			gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
-			gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
-			gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
-			gx1x2     += tx2 * dx1;
-			gy1x2     += tx2 * dy1;
-			gx1y2     += ty2 * dx1;
-			gy1y2     += ty2 * dy1;
-			gx1p2x2   += tx2 * dx1 * dx1;
-			gx1y1y2   += ty2 * dx1 * dy1;
-			gx1y1x2   += tx2 * dx1 * dy1;
-			gy1p2y2   += ty2 * dy1 * dy1;
-		}
-	}
+                g0        += t0;
+                gx2       += tx2;
+                gy2       += ty2;
+                gx1p1     += t0  * dx1;
+                gx1p2     += t0  * dx1 * dx1;
+                gx1p3     += t0  * dx1 * dx1 * dx1;
+                gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
+                gy1p1     += t0  * dy1;
+                gy1p2     += t0  * dy1 * dy1;
+                gy1p3     += t0  * dy1 * dy1 * dy1;
+                gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
+                gx1p1y1p1 += t0  * dx1 * dy1;
+                gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
+                gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
+                gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
+                gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
+                gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
+                gx1x2     += tx2 * dx1;
+                gy1x2     += tx2 * dy1;
+                gx1y2     += ty2 * dx1;
+                gy1y2     += ty2 * dy1;
+                gx1p2x2   += tx2 * dx1 * dx1;
+                gx1y1y2   += ty2 * dx1 * dy1;
+                gx1y1x2   += tx2 * dx1 * dy1;
+                gy1p2y2   += ty2 * dy1 * dy1;
+            }
+        }
+    }
+
+	
+
+	
 
     // printf("g0 = %f\n", g0);
 
