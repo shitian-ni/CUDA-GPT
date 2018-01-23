@@ -22,6 +22,17 @@ __device__ char d_sHoG1[ROW - 4][COL - 4];
 
 int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
 
+//https://stackoverflow.com/a/14038590
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 __global__ void Ht_1() {
 	int margin = 2;
     int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -267,7 +278,9 @@ __global__ void cuda_defcan2() {
 	d_g_can1[y][x] = ratio * ((double)d_image1[y][x] - s_vars[0]);
 }
 
-void* d_image1_ptr; void* d_image2_ptr; void* d_H_ptr;void*  d_Ht_ptr;void*  d_g_ptr;void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;void* d_sHoG1_ptr;
+void* d_image1_ptr; void* d_image2_ptr; void* d_H_ptr;void*  d_Ht_ptr;void*  d_g_ptr;
+void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;void* d_sHoG1_ptr;
+void* d_cuda_defcan_vars_ptr;
 double g[G_NUM];
 
 dim3 numBlock;
@@ -279,20 +292,21 @@ void cuda_init_parameter(unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
 	numThread.x = TPB;
 	numThread.y = TPB;
 
-	cudaGetSymbolAddress(&d_image1_ptr,d_image1);
-	cudaGetSymbolAddress(&d_H_ptr,d_H);
-	cudaGetSymbolAddress(&d_Ht_ptr,d_Ht);
-	cudaGetSymbolAddress(&d_g_ptr,d_g);
-	cudaGetSymbolAddress(&d_sHoG1_ptr,d_sHoG1);
-	cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1);
-	cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1);
-	cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1);
-	
+	gpuErrchk( cudaGetSymbolAddress(&d_image1_ptr,d_image1));
+	gpuErrchk( cudaGetSymbolAddress(&d_H_ptr,d_H));
+	gpuErrchk( cudaGetSymbolAddress(&d_Ht_ptr,d_Ht));
+	gpuErrchk( cudaGetSymbolAddress(&d_g_ptr,d_g));
+	gpuErrchk( cudaGetSymbolAddress(&d_sHoG1_ptr,d_sHoG1));
+	gpuErrchk( cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1));
+	gpuErrchk( cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1));
+	gpuErrchk( cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1));
+	gpuErrchk( cudaGetSymbolAddress(&d_cuda_defcan_vars_ptr,d_cuda_defcan_vars));
 
-	cudaMemcpy(d_image1_ptr, image1, 1024 * 1024 *sizeof(unsigned char), cudaMemcpyHostToDevice);
-	cudaMemset(d_cuda_defcan_vars, 0, 2 * sizeof(double));
+	gpuErrchk( cudaMemset(d_cuda_defcan_vars_ptr, 0, 2 * sizeof(double)));
 
-	cudaDeviceSynchronize();
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 
 __global__ void test(){
@@ -304,26 +318,25 @@ __global__ void test(){
     }
 
     printf("d_g_can1[%d][%d]: %.5f\n",y,x,d_g_can1[y][x]);
+    printf("d_sHoG1_ptr[%d][%d]: %.5f\n",y,x,d_sHoG1[y][x]);
 }
 
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
-	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
-	cudaDeviceSynchronize();
-	printf("a");
-	for(int i=0;i<2;i++){
-		for(int j=0;j<2;j++){
-			printf("g_can1[%d][%d]: %.5f\n",i,j,g_can1[i][j]);
-		}
-	}
+	// gpuErrchk();
+
+
+	gpuErrchk( cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice));
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
+
+
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
-	printf("b");
 	test<<<numBlock, numThread>>>();
 	cudaDeviceSynchronize();
-	printf("c");
 	// double newVar = 0.5;
 	// if (newVar > 1.0) {
 	// 	Ht_1<<<numBlock, numThread>>>();

@@ -128,7 +128,7 @@
 #define ROW 136           /* Vertical   size of image  */
 #define COL2 340          /* Horizontal size of image  */
 #define ROW2 272          /* Vertical   size of image  */
-#define ROW_H ROW-4
+#define ROW_H (ROW-4)
 #define COL_H ((COL - 4) * 6 * 64 * 3)
 #define COL_Ht ((COL - 4) * 64 * 3)
 #define CX  85

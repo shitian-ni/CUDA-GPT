@@ -3,3 +3,4 @@ void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double 
 
 void cuda_Ht(double newVar);
 double* cuda_calc_g();
+
