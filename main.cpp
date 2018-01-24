@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include<iostream>
 
 
 #include"include/parameter.h"
@@ -13,6 +14,8 @@
 #include"include/stdGpt.h"
 #include"include/acclGpt.h"
 #include "include/acclGpt_cuda.h"
+
+using namespace std;
 
 /* Image storage arrays */
 unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE];
@@ -199,18 +202,22 @@ int main() {
 			// fnsgptcorSpHOG5x5_far(g_ang1, sHoG1, g_can1, gpt1, dnn, H3, Ht3);
 		}
 
+
 		/* transform the test image and update g_can1, g_ang1, g_nor1, g_HoG1, sHoG1 */
 		for (y = 0; y < ROW2; y++)
 			for (x = 0; x < COL2; x++)
 				image1[y][x] = (unsigned char)image3[y][x];
 		bilinear_normal_projection(gpt1, COL, ROW, COL2, ROW2, image1, image2);
+
 		procImg(g_can1, g_ang1, g_nor1, g_HoG1, sHoG1, image2);
 
 		/* update correlation */
 		new_cor1 = 0.0;
-		for (y = MARGINE ; y < ROW - MARGINE ; y++)
-			for (x = MARGINE ; x < COL - MARGINE ; x++)
+		for (y = MARGINE ; y < ROW - MARGINE ; y++){
+			for (x = MARGINE ; x < COL - MARGINE ; x++){
 				new_cor1 += g_can1[y][x] * g_can2[y][x];
+			}
+		}
 
 		/* display message */
 		printf("iter = %d, new col. = %f dnn = %f  var = %f\n", iter, new_cor1, dnn, 1 / var);

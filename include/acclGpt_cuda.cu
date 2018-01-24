@@ -42,6 +42,10 @@ __global__ void Ht_1() {
     }
 
     d_Ht[y][x] =  d_H[y][x + (COL - 2 * margin) * 3 * 64 * 5];
+    // if ((y >= 55) || (x >= 55)||(y < 50) || (x < 50)) {
+    //     return;
+    // }                             
+    // printf("Ht_1 d_Ht[%d][%d]: %.5f\n",y,x,d_Ht[y][x]);     
 };
 __global__ void Ht_2() {
 	int margin = 2;
@@ -52,6 +56,10 @@ __global__ void Ht_2() {
     }
 
     d_Ht[y][x] =  d_H[y][x];
+    // if ((y >= 55) || (x >= 55)||(y < 50) || (x < 50)) {
+    //     return;
+    // }                             
+    // printf("Ht_2 d_Ht[%d][%d]: %.5f\n",y,x,d_Ht[y][x]);     
 };
 __global__ void Ht_3(int count, double newVar) {
 	int margin = 2;
@@ -66,7 +74,15 @@ __global__ void Ht_3(int count, double newVar) {
     d_Ht[y][x] = d_H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
                                    (d_H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var_p_1 - var)
-                                 * (newVar - var);;
+                                 * (newVar - var);
+    // printf("Ht_3 d_H[%d][%d]: %.5f\n",y,x,d_H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
+    //                                (d_H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H[y][x + (COL - 2 * margin) * 3 * 64 * count])
+    //                              / (var_p_1 - var)
+    //                              * (newVar - var));
+    // if ((y >= 55) || (x >= 55)||(y < 50) || (x < 50)) {
+    //     return;
+    // }                             
+    // printf("Ht_3 d_Ht[%d][%d]: %.5f\n",y,x,d_Ht[y][x]);                         
 };
 
 
@@ -84,21 +100,22 @@ __device__ void customAdd(double* g_idata,double* g_odata, int g_i){
     __syncthreads();
  
 	// do reduction in shared mem
-	if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads();
-	if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads();
-	if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads();
-	if (tid < 64) { sdata[tid] += sdata[tid + 64]; } __syncthreads();
-	if (tid < 32){
-		sdata[tid] += sdata[tid + 32];__syncthreads();
-		sdata[tid] += sdata[tid + 16];__syncthreads();
-		sdata[tid] += sdata[tid + 8];__syncthreads();
-		sdata[tid] += sdata[tid + 4];__syncthreads();
-		sdata[tid] += sdata[tid + 2];__syncthreads();
-		sdata[tid] += sdata[tid + 1];__syncthreads();
-	}
+	// if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads();
+	// if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads();
+	// if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads();
+	// if (tid < 64) { sdata[tid] += sdata[tid + 64]; } __syncthreads();
+	// if (tid < 32){
+	// 	sdata[tid] += sdata[tid + 32];__syncthreads();
+	// 	sdata[tid] += sdata[tid + 16];__syncthreads();
+	// 	sdata[tid] += sdata[tid + 8];__syncthreads();
+	// 	sdata[tid] += sdata[tid + 4];__syncthreads();
+	// 	sdata[tid] += sdata[tid + 2];__syncthreads();
+	// 	sdata[tid] += sdata[tid + 1];__syncthreads();
+	// }
 
-	// write result for this block to global mem
-	if (tid == 0) atomicAdd(&g_odata[g_i]        , sdata[tid]);
+	// // write result for this block to global mem
+	// if (tid == 0) atomicAdd(&g_odata[g_i]        , sdata[tid]);
+	atomicAdd(&g_odata[g_i]        , sdata[tid]);
 }
 
 __device__ double d_weightedAVG_data_to_sum[G_NUM][ROW_X_COL];
@@ -126,9 +143,8 @@ __global__ void weightedAVG() {
             break;
         }
     }
-    printf("d_sHoG1[%d][%d]: %.5f\n",y1-margin,x1-margin,d_sHoG1[y1 - margin][x1 - margin]);
-    printf("d_g_can1[%d][%d]: %.5f\n",y1,x1,d_g_can1[y1][x1]);
-    // printf("d_sHoG1[%d][%d]: %.5f\n",y1-margin,x1-margin,d_sHoG1[y1 - margin][x1 - margin]);
+    
+    
     if (thre == -1) {
         printf("ERROR! \n");
     }
@@ -136,7 +152,7 @@ __global__ void weightedAVG() {
 	double t0     = d_Ht[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
     double tx2    = d_Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * d_g_can1[y1][x1];
     double ty2    = d_Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
-
+    
 	d_weightedAVG_data_to_sum[0][y1*COL+x1]=t0;
 	d_weightedAVG_data_to_sum[21][y1*COL+x1]=tx2;
 	d_weightedAVG_data_to_sum[22][y1*COL+x1]=ty2;
@@ -310,78 +326,51 @@ void cuda_init_parameter(unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
 }
 
 __global__ void test(){
-	int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int y = blockIdx.y*blockDim.y + threadIdx.y;
+	// int x = blockIdx.x*blockDim.x + threadIdx.x;
+ //    int y = blockIdx.y*blockDim.y + threadIdx.y;
+ //    if ((y >= ROW - 2 * margin) || (x >= 3 * 64 * (COL - 2 * margin))) {
+ //        return;
+ //    }
 
-    if ((y >= 2) || (x >= 2)) {
-        return;
-    }
 
-    printf("d_g_can1[%d][%d]: %.5f\n",y,x,d_g_can1[y][x]);
-    printf("d_sHoG1_ptr[%d][%d]: %.5f\n",y,x,d_sHoG1[y][x]);
 }
 
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
-	// gpuErrchk();
-
 
 	gpuErrchk( cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice));
 	gpuErrchk(cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice));
 	gpuErrchk(cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice));
+	gpuErrchk( cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice));
+
 	gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
-
-
-	numBlock.x = iDivUp(COL, TPB);
-	numBlock.y = iDivUp(ROW, TPB);
-	test<<<numBlock, numThread>>>();
-	cudaDeviceSynchronize();
-	// double newVar = 0.5;
-	// if (newVar > 1.0) {
-	// 	Ht_1<<<numBlock, numThread>>>();
-	// } else if (newVar < 1.0 / 32.0) {
-	// 	Ht_2<<<numBlock, numThread>>>();
-	// } else {
-	// 	int count = floor(log2(newVar)) + 5;
-	// 	Ht_3<<<numBlock, numThread>>>(count, newVar);
-	// }
-	// int margin = 2;
-	// numBlock.x = iDivUp(3 * 64 * (COL - 2 * margin), TPB);
-	// numBlock.y = iDivUp(ROW - 2 * margin, TPB);
-	// weightedAVG<<<numBlock, numThread>>>();
-	// cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
-	// printf("g0 in cuda_calc_g : %.5f\n",g[0]);
-	//return g;
 }
 
 void cuda_Ht(double newVar){
-	// numBlock.x = iDivUp(COL, TPB);
-	// numBlock.y = iDivUp(ROW, TPB);
-	// if (newVar > 1.0) {
-	// 	Ht_1<<<numBlock, numThread>>>();
-	// } else if (newVar < 1.0 / 32.0) {
-	// 	Ht_2<<<numBlock, numThread>>>();
-	// } else {
-	// 	int count = floor(log2(newVar)) + 5;
-	// 	Ht_3<<<numBlock, numThread>>>(count, newVar);
-	// }
-	// int margin = 2;
-	// numBlock.x = iDivUp(3 * 64 * (COL - 2 * margin), TPB);
-	// numBlock.y = iDivUp(ROW - 2 * margin, TPB);
-	// weightedAVG<<<numBlock, numThread>>>();
-	// cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
-	// printf("g0 in cuda_calc_g : %.5f\n",g[0]);
-	// return g;
+	int margin = 2;
+	numBlock.x = iDivUp(3 * 64 * (COL - 2 * margin), TPB);
+	numBlock.y = iDivUp(ROW - 2 * margin, TPB);
+	if (newVar > 1.0) {
+		Ht_1<<<numBlock, numThread>>>();
+	} else if (newVar < 1.0 / 32.0) {
+		Ht_2<<<numBlock, numThread>>>();
+	} else {
+		int count = floor(log2(newVar)) + 5;
+		Ht_3<<<numBlock, numThread>>>(count, newVar);
+	}
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 double* cuda_calc_g(){
-	// int margin = 2;
-	// numBlock.x = iDivUp(3 * 64 * (COL - 2 * margin), TPB);
-	// numBlock.y = iDivUp(ROW - 2 * margin, TPB);
-	// weightedAVG<<<numBlock, numThread>>>();
-	// cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
-	// printf("g0 in cuda_calc_g : %.5f\n",g[0]);
+	gpuErrchk( cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double)));
+	numBlock.x = iDivUp(COL, TPB);
+	numBlock.y = iDivUp(ROW, TPB);
+	weightedAVG<<<numBlock, numThread>>>();
+	gpuErrchk( cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost));
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 	return g;
 }
-
-

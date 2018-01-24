@@ -494,7 +494,8 @@ void gatcor(int g_ang1[ROW][COL], double g_can1[ROW][COL],
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2;
-	double g0, gx1, gy1, gx2, gy2, gx1x1, gx1y1, gy1y1, gx1x2, gx1y2, gy1x2, gy1y2;
+	
+	double* g = (double*) malloc (G_NUM * sizeof(double));
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double det, U11, U12, U21, U22;
 	double W11, W12, W21, W22, Uinv11, Uinv12, Uinv21, Uinv22;
@@ -623,7 +624,7 @@ void pptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL],
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2;
-	double g0;
+	double* g = (double*) malloc (G_NUM * sizeof(double));
 	double tv, t0, tx2, ty2;
 	double det, U11, U12, U21, U22, Uinv11, Uinv12, Uinv21, Uinv22, v1, v2;
 	double dx1, dx2, dy1, dy2;
@@ -715,7 +716,9 @@ void ngatcor(int g_ang1[ROW][COL], double g_can1[ROW][COL],
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2;
-	double g0, gx1, gy1, gx2, gy2, gx1x1, gx1y1, gy1y1, gx1x2, gx1y2, gy1x2, gy1y2;
+	// double g0, gx1, gy1, gx2, gy2, gx1x1, gx1y1, gy1y1, gx1x2, gx1y2, gy1x2, gy1y2;
+	double* g = (double*) malloc (G_NUM * sizeof(double));
+
 	double tv, t0, tx2, ty2;
 	double det, U11, U12, U21, U22;
 	double Uinv11, Uinv12, Uinv21, Uinv22;
@@ -892,14 +895,13 @@ void npptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL],
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2;
-	double g0;
+	double* g = (double*) malloc (G_NUM * sizeof(double));
 	double tv, t0, tx2, ty2;
 	double det, U11, U12, U21, U22, Uinv11, Uinv12, Uinv21, Uinv22, v1, v2;
 	double dx1, dx2, dy1, dy2;
 	double tIn12, tIn11, gIn12x1x1, gIn12x1y1, gIn12y1y1, gIn11x1, gIn11y1, gIn12x1, gIn12y1;
 	double tGpt1[3][3], tGpt2[3][3];
 	double gIn11, gIn12, gIn22;
-	double gx1, gy1;
 
 	/* Gaussian weigthed mean values */
 	gIn12x1x1 = gIn12x1y1 = gIn12y1y1 = gIn11x1 = gIn11y1 = gIn12x1 = gIn12y1 = 0.0;
@@ -988,9 +990,10 @@ void sgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL],
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2;
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	// double gx1, gy1;
+	// double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	double* g = (double*) malloc (G_NUM * sizeof(double));
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;
@@ -1127,9 +1130,10 @@ void nsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL],
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2;
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	// double gx1, gy1;
+	// double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	double* g = (double*) malloc (G_NUM * sizeof(double));
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;
@@ -1349,9 +1353,10 @@ void nsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], double
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2, nDir;
 	char HoG1[8], HoG2[8];
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	// double gx1, gy1;
+	// double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	double* g = (double*) malloc (G_NUM * sizeof(double));
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;

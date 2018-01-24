@@ -1,50 +1,10 @@
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <math.h>
-// #include <time.h>
-// #include<iostream>
-// #include<string.h>
-// #include "parameter.h"
+// 0.323944 2.31779e-310 3.85359e-315 -3.66586 203.869 -16320.4 329354 0.131884 131.929 1357.02 136663 -163.102 3222.36 -523141 -4482.47 217930 -133324 203.489 -166.652 -172.708 131.956 -4.0527 0.188576 -16455.7 -4628.92 3255.89 1321.42 2.37152e-322 3.85359e-315 0 
 
-// using namespace std;
-
-// __device__ double d_H[ROW_H][COL_H];
-
-// int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
-
-// //https://stackoverflow.com/a/14038590
-// #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-// inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-// {
-//    if (code != cudaSuccess) 
-//    {
-//       fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-//       if (abort) exit(code);
-//    }
-// }
-
-// void* d_H_ptr;
-// dim3 numBlock;
-// dim3 numThread;
-
-// int main(){
-	
-// 	double H[ROW_H][COL_H];
-
-// 	numBlock.x = iDivUp(COL, TPB);
-// 	numBlock.y = iDivUp(ROW, TPB);
-// 	numThread.x = TPB;
-// 	numThread.y = TPB;
-
-// 	cudaGetSymbolAddress(&d_H_ptr,d_H);
-
-
-// 	cudaDeviceSynchronize();
-
-// 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
-//     gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-// 	gpuErrchk( cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice));
-// 	gpuErrchk( cudaDeviceSynchronize() );
-
-
-// }
+/*
+Ht:
+0.02959962169223415498 0.03756298283349133321 0.04522506271776877834 0.05163404423738983395 0.05585669756396497571 
+0.03448106613761663108 0.04320558085947644178 0.05122679339103448221 0.05749202454073323865 0.06111719431516070972 
+0.03914816528361166753 0.04863110872392518991 0.05702514192307383406 0.06318009450547781847 0.06627009196958551229 
+0.04309011673726623887 0.05329881855646859123 0.06213952981244912077 0.06838387071297476194 0.07125681560424824978 
+0.04591415428536365501 0.05680559509630415949 0.06624022306531884841 0.07294507531448418680 0.07617236871303958989 
+*/

@@ -6,12 +6,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <iostream>
 
 #include "parameter.h"
 #include "utility.h"
 #include "stdGpt.h"
 #include "acclGpt.h"
 #include "acclGpt_cuda.h"
+
+using namespace std;
 
 void winTbl(int g_ang2[ROW][COL], double D[ROW][COL * 8], char *fn);
 void winTbl64(char sHoG2[ROW - 4][COL - 4], double D2[ROW - 4][(COL - 4) * 64], char *fn);
@@ -692,9 +695,12 @@ void fnsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL], double gpt[3][3], 
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2, x, y, thre;
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	// double gx1, gy1;
+	// double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+    double* g = (double*) malloc (G_NUM * sizeof(double));
+
+
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;
@@ -936,14 +942,16 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2, x, y, thre, s;
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	// double gx1, gy1;
+	// double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+    double* g = (double*) malloc (G_NUM * sizeof(double));
+
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;
 	double tGpt1[3][3], tGpt2[3][3];
-    double* g;
+    
 
 	int count = 0;
 	newVar = 1.0 / (WGT * dnn * WGT * dnn);
@@ -954,7 +962,7 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
         cuda_update_parameter(g_ang1, g_can1, H,sHoG1);
         cuda_Ht(newVar);
         g = cuda_calc_g();
-        printf("G0: %.5f\n",g[0]);    
+        
     } else {
         if (newVar > 1.0) {
             for (y = 0 ; y < ROW - 2 * margin ; y++) {
@@ -980,6 +988,7 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
                 }
             }
         }
+    
 
         /* Gaussian weigthed mean values */
         g0 = gx2 = gy2 = 0.0;
@@ -1041,7 +1050,10 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
     }
 
 	
-
+    for(int i=0;i<G_NUM;i++){
+        cout<<g[i]<<" ";
+    }
+    cout<<endl;
 	
 
     // printf("g0 = %f\n", g0);
@@ -1190,6 +1202,8 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 	}
 
 	// print3x3(gpt);
+
+   
 }
 
 void fnsgptcorSpHOG5x5_far(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], double g_can1[ROW][COL],
@@ -1203,9 +1217,11 @@ void fnsgptcorSpHOG5x5_far(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], d
 	/* determination of optimal GAT components */
 	/* that yield the maximal correlation value */
 	int x1, y1, x2, y2, x, y, thre, s;
-	double gx1, gy1;
-	double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
-	double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+	// double gx1, gy1;
+	// double g0, gx1p1, gx1p2, gx1p3, gx1p4, gy1p1, gy1p2, gy1p3, gy1p4, gx1p1y1p1, gx1p2y1p1, gx1p3y1p1, gx1p1y1p2, gx1p2y1p2, gx1p1y1p3;
+	// double gx1x2, gy1x2, gx1y2, gy1y2, gx2, gy2, gx1p2x2, gx1y1y2, gx1y1x2, gy1p2y2;
+    double* g = (double*) malloc (G_NUM * sizeof(double));
+
 	double tv, t0, tx2, ty2, gx2x2, gx2y2, gy2y2;
 	double denom;
 	double dx1, dx2, dy1, dy2;

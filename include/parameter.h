@@ -38,8 +38,38 @@
 /* CUDA parameters */
 #define TPB 32
 #define TPB_X_TPB TPB*TPB
-#define G_NUM 27
+#define G_NUM 30
 
+#define g0 g[0]
+#define gx1 g[1]
+#define gy1 g[2]
+#define gx1p1 g[3]
+#define gx1p2 g[4]
+#define gx1p3 g[5]
+#define gx1p4 g[6]
+#define gy1p1 g[7]
+#define gy1p2 g[8]
+#define gy1p3 g[9]
+#define gy1p4 g[10]
+#define gx1p1y1p1 g[11]
+#define gx1p2y1p1 g[12]
+#define gx1p3y1p1 g[13]
+#define gx1p1y1p2 g[14]
+#define gx1p2y1p2 g[15]
+#define gx1p1y1p3 g[16]
+#define gx1x2 g[17]
+#define gy1x2 g[18]
+#define gx1y2 g[19]
+#define gy1y2 g[20]
+#define gx2 g[21]
+#define gy2 g[22]
+#define gx1p2x2 g[23]
+#define gx1y1y2 g[24]
+#define gx1y1x2 g[25]
+#define gy1p2y2 g[26]
+#define gx1x1 g[27]
+#define gx1y1 g[28]
+#define gy1y1 g[29]
 
 /* switch template table type 
  0: automatical selection of the type of window size
