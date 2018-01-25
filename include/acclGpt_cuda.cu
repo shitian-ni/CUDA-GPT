@@ -88,30 +88,33 @@ __global__ void Ht_3(int count, double newVar) {
 
 //1000 times 1200~1300ms
 //http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/reduction/doc/reduction.pdf
-__device__ void customAdd(double* sdata,double* g_odata, int g_i){
+__device__ void customAdd(double* sdata,double* g_odata){
  	int tx = threadIdx.x;
     int ty = threadIdx.y;
     int tid = ty * blockDim.x + tx;
 	// do reduction in shared mem
-	// if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads();
-	// if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads();
-	// if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads();
-	// if (tid < 64) { sdata[tid] += sdata[tid + 64]; } __syncthreads();
-	// if (tid < 32){
-	// 	sdata[tid] += sdata[tid + 32];__syncthreads();
-	// 	sdata[tid] += sdata[tid + 16];__syncthreads();
-	// 	sdata[tid] += sdata[tid + 8];__syncthreads();
-	// 	sdata[tid] += sdata[tid + 4];__syncthreads();
-	// 	sdata[tid] += sdata[tid + 2];__syncthreads();
-	// 	sdata[tid] += sdata[tid + 1];__syncthreads();
-	// }
-
+	if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads();
+	if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads();
+	if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads();
+	if (tid < 64) { sdata[tid] += sdata[tid + 64]; } __syncthreads();
+	if (tid < 32){ sdata[tid] += sdata[tid + 32]; }__syncthreads();
+	if (tid < 16){ sdata[tid] += sdata[tid + 16]; }__syncthreads();
+	if (tid < 8){ sdata[tid] += sdata[tid + 8]; }__syncthreads();
+	if (tid < 4){ sdata[tid] += sdata[tid + 4]; }__syncthreads();
+	if (tid < 2){ sdata[tid] += sdata[tid + 2]; }__syncthreads();
+	if (tid < 1){ sdata[tid] += sdata[tid + 1]; }__syncthreads();
+ // __syncthreads(); 
 	// // write result for this block to global mem
-	// if (tid == 0) atomicAdd(&g_odata[g_i]        , sdata[tid]);
-	atomicAdd(&g_odata[g_i]        , sdata[tid]);
+	if (tid == 0) {atomicAdd(g_odata        , sdata[tid]);}
+ // __syncthreads(); 
+	// }
+	//  __syncthreads(); 
+	// __syncthreads();
+	// sdata[tid] = tem;
+	// __syncthreads();
+	// atomicAdd(&g_odata[g_i]        , sdata[tid]);
 }
 
-__device__ double d_weightedAVG_data_to_sum[G_NUM][ROW_X_COL];
 __global__ void weightedAVG() {
 
 	__shared__ double sdata[TPB_X_TPB];
@@ -129,7 +132,7 @@ __global__ void weightedAVG() {
 	double t0 = 0;
 	double tx2 = 0;
 	double ty2 = 0;
-
+	__syncthreads(); 
     if ((y1 >= ROW-margin) || (x1 >= COL-margin) || (y1 < margin) || (x1 < margin) ) {
 
     } else {
@@ -158,32 +161,107 @@ __global__ void weightedAVG() {
 		    ty2    = d_Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
 		}
     }
-    sdata[tid]=t0; __syncthreads(); customAdd(sdata,d_g,0); __syncthreads(); 
-	sdata[tid]=tx2; __syncthreads(); customAdd(sdata,d_g,21); __syncthreads(); 
-	sdata[tid]=ty2; __syncthreads(); customAdd(sdata,d_g,22); __syncthreads(); 
-	sdata[tid]=t0  * dx1; __syncthreads(); customAdd(sdata,d_g,3); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g,4); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g,5); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g,6); __syncthreads(); 
-	sdata[tid]=t0  * dy1; __syncthreads(); customAdd(sdata,d_g,7); __syncthreads();  
-	sdata[tid]=t0  * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,8); __syncthreads();  
-	sdata[tid]=t0  * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,9); __syncthreads();  
-	sdata[tid]=t0  * dy1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,10); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g,11); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g,12); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g,13); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,14); __syncthreads();  
-	sdata[tid]=t0  * dx1 * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,15); __syncthreads(); 
-	sdata[tid]=t0  * dx1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,16); __syncthreads();  
-	sdata[tid]=tx2 * dx1; __syncthreads(); customAdd(sdata,d_g,17); __syncthreads();  
-	sdata[tid]=tx2 * dy1; __syncthreads(); customAdd(sdata,d_g,18); __syncthreads(); 
-	sdata[tid]=ty2 * dx1; __syncthreads(); customAdd(sdata,d_g,19); __syncthreads(); 
-	sdata[tid]=ty2 * dy1; __syncthreads(); customAdd(sdata,d_g,20); __syncthreads();  
-	sdata[tid]=tx2 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g,23); __syncthreads();  
-	sdata[tid]=ty2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g,24); __syncthreads();  
-	sdata[tid]=tx2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g,25); __syncthreads();  
-	sdata[tid]=ty2 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g,26); __syncthreads();   
-
+    __syncthreads(); 
+    sdata[tid]=t0; __syncthreads(); customAdd(sdata,d_g); __syncthreads(); 
+ //    if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[0]);
+	// }
+	sdata[tid]=tx2; __syncthreads(); customAdd(sdata,d_g+21); __syncthreads(); 
+	// // if(x1==0&&y1==0){
+	// // 	printf("%.5f ",d_g[1]);
+	// // }
+	sdata[tid]=ty2; __syncthreads(); customAdd(sdata,d_g+22); __syncthreads(); 
+	// // if(x1==0&&y1==0){
+	// // 	printf("%.5f ",d_g[2]);
+	// // }
+	sdata[tid]=t0  * dx1; __syncthreads(); customAdd(sdata,d_g+3); __syncthreads(); 
+	// //   if(x1==0&&y1==0){
+	// // 	printf("%.5f ",d_g[3]);
+	// // }
+	sdata[tid]=t0  * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+4); __syncthreads(); 
+	// //   if(x1==0&&y1==0){
+	// // 	printf("%.5f ",d_g[4]);
+	// // }
+	sdata[tid]=t0  * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+5); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[5]);
+	// }
+	sdata[tid]=t0  * dx1 * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+6); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[6]);
+	// }
+	sdata[tid]=t0  * dy1; __syncthreads(); customAdd(sdata,d_g+7); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[7]);
+	// }
+	sdata[tid]=t0  * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+8); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[8]);
+	// }
+	sdata[tid]=t0  * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+9); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[9]);
+	// }
+	sdata[tid]=t0  * dy1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+10); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[10]);
+	// }
+	sdata[tid]=t0  * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+11); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[11]);
+	// }
+	sdata[tid]=t0  * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+12); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[12]);
+	// }
+	sdata[tid]=t0  * dx1 * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+13); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[13]);
+	// }
+	sdata[tid]=t0  * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+14); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[14]);
+	// }
+	sdata[tid]=t0  * dx1 * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+15); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[15]);
+	// }
+	sdata[tid]=t0  * dx1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+16); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[16]);
+	// }
+	sdata[tid]=tx2 * dx1; __syncthreads(); customAdd(sdata,d_g+17); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[17]);
+	// }
+	sdata[tid]=tx2 * dy1; __syncthreads(); customAdd(sdata,d_g+18); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[18]);
+	// }
+	sdata[tid]=ty2 * dx1; __syncthreads(); customAdd(sdata,d_g+19); __syncthreads(); 
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[19]);
+	// }
+	sdata[tid]=ty2 * dy1; __syncthreads(); customAdd(sdata,d_g+20); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[20]);
+	// }
+	sdata[tid]=tx2 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+23); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[23]);
+	// }
+	sdata[tid]=ty2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+24); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[24]);
+	// }
+	sdata[tid]=tx2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+25); __syncthreads();  
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[25]);
+	// }
+	sdata[tid]=ty2 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+26); __syncthreads();   
+	// if(x1==0&&y1==0){
+	// 	printf("%.5f ",d_g[26]);
+	// }
 
 
 	// d_weightedAVG_data_to_sum[0][y1*COL+x1]=t0;
@@ -296,7 +374,7 @@ __global__ void cuda_defcan1() {
 	__syncthreads();
 
 	for(int i=0;i<2;i++){
-		customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars,i);
+		customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars+i);
 	}
 }
 __global__ void cuda_defcan2() {
@@ -405,8 +483,9 @@ double* cuda_calc_g(){
 	gpuErrchk( cudaDeviceSynchronize() );
 	gpuErrchk( cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost));
 	
-
-	cout<<g[0]<<endl;
+	// for(int i=0;i<G_NUM;i++)
+	// 	cout<<g[i]<<" ";
+	// cout<<endl;
 	gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error

@@ -1050,10 +1050,10 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
     }
 
 	
-    // for(int i=0;i<G_NUM;i++){
-    //     cout<<g[i]<<" ";
-    // }
-    // cout<<endl;
+    for(int i=0;i<G_NUM;i++){
+        cout<<g[i]<<" ";
+    }
+    cout<<endl;
 	
 
     // printf("g0 = %f\n", g0);
