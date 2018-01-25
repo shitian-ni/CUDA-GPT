@@ -121,6 +121,7 @@ __global__ void weightedAVG() {
         }
     }
 	
+
     sdata[0][tid]=t0; 
 	sdata[1][tid]=tx2; 
 	sdata[2][tid]=ty2; 
@@ -128,6 +129,7 @@ __global__ void weightedAVG() {
 	sdata[4][tid]=t0  * dx1 * dx1; 
 	sdata[5][tid]=t0  * dx1 * dx1 * dx1; 
 	__syncthreads(); 
+
 	customAdd(sdata[0],d_g); 
 	customAdd(sdata[1],d_g+21);
 	customAdd(sdata[2],d_g+22);
@@ -143,6 +145,7 @@ __global__ void weightedAVG() {
 	sdata[4][tid]=t0  * dy1 * dy1 * dy1 * dy1; 
 	sdata[5][tid]=t0  * dx1 * dy1; 
 	__syncthreads(); 
+
 	customAdd(sdata[0],d_g+6);
 	customAdd(sdata[1],d_g+7);
 	customAdd(sdata[2],d_g+8);
@@ -158,6 +161,7 @@ __global__ void weightedAVG() {
 	sdata[4][tid]=t0  * dx1 * dy1 * dy1 * dy1;
 	sdata[5][tid]=tx2 * dx1; 
 	__syncthreads();  
+
 	customAdd(sdata[0],d_g+12);
 	customAdd(sdata[1],d_g+13);
 	customAdd(sdata[2],d_g+14);
@@ -173,6 +177,7 @@ __global__ void weightedAVG() {
 	sdata[4][tid]=ty2 * dx1 * dy1;  
 	sdata[5][tid]=tx2 * dx1 * dy1; 
 	__syncthreads();
+
 	customAdd(sdata[0],d_g+18);
 	customAdd(sdata[1],d_g+19);
 	customAdd(sdata[2],d_g+20);
@@ -368,14 +373,14 @@ __global__ void test(){
 
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
 
-	gpuErrchk( cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice));
-	gpuErrchk(cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice));
-	gpuErrchk(cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice));
-	gpuErrchk( cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice));
+	cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
 
-	gpuErrchk( cudaDeviceSynchronize() );
-    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
+	// gpuErrchk( cudaDeviceSynchronize() );
+ //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	// gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 
 void cuda_Ht(double newVar){
@@ -390,24 +395,22 @@ void cuda_Ht(double newVar){
 		int count = floor(log2(newVar)) + 5;
 		Ht_3<<<numBlock, numThread>>>(count, newVar);
 	}
-	gpuErrchk( cudaDeviceSynchronize() );
-    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
+	// gpuErrchk( cudaDeviceSynchronize() );
+ //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	// gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 double* cuda_calc_g(){
-	gpuErrchk( cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double)));
+	cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double));
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	weightedAVG<<<numBlock, numThread>>>();
-	gpuErrchk( cudaPeekAtLastError() );
-	gpuErrchk( cudaDeviceSynchronize() );
-	gpuErrchk( cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost));
+	// gpuErrchk( cudaPeekAtLastError() );
+ //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	// gpuErrchk( cudaDeviceSynchronize() );
+	cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
 	
 	// for(int i=0;i<G_NUM;i++)
 	// 	cout<<g[i]<<" ";
 	// cout<<endl;
-	gpuErrchk( cudaDeviceSynchronize() );
-    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 	return g;
 }
