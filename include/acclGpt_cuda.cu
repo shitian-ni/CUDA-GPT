@@ -42,10 +42,6 @@ __global__ void Ht_1() {
     }
 
     d_Ht[y][x] =  d_H[y][x + (COL - 2 * margin) * 3 * 64 * 5];
-    // if ((y >= 55) || (x >= 55)||(y < 50) || (x < 50)) {
-    //     return;
-    // }                             
-    // printf("Ht_1 d_Ht[%d][%d]: %.5f\n",y,x,d_Ht[y][x]);     
 };
 __global__ void Ht_2() {
 	int margin = 2;
@@ -55,11 +51,7 @@ __global__ void Ht_2() {
         return;
     }
 
-    d_Ht[y][x] =  d_H[y][x];
-    // if ((y >= 55) || (x >= 55)||(y < 50) || (x < 50)) {
-    //     return;
-    // }                             
-    // printf("Ht_2 d_Ht[%d][%d]: %.5f\n",y,x,d_Ht[y][x]);     
+    d_Ht[y][x] =  d_H[y][x];   
 };
 __global__ void Ht_3(int count, double newVar) {
 	int margin = 2;
@@ -68,21 +60,12 @@ __global__ void Ht_3(int count, double newVar) {
     if ((y >= ROW - 2 * margin) || (x >= 3 * 64 * (COL - 2 * margin))) {
         return;
     }
-    // double varTable[6] = {1.0 / 32, 1.0 / 16.0, 1.0 / 8.0, 1.0 / 4.0, 1.0 / 2.0, 1.0};
     double var_p_1 = pow(2.0,count + 1 -5);
     double var = var_p_1 / 2.0;
     d_Ht[y][x] = d_H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
                                    (d_H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var_p_1 - var)
-                                 * (newVar - var);
-    // printf("Ht_3 d_H[%d][%d]: %.5f\n",y,x,d_H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
-    //                                (d_H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H[y][x + (COL - 2 * margin) * 3 * 64 * count])
-    //                              / (var_p_1 - var)
-    //                              * (newVar - var));
-    // if ((y >= 55) || (x >= 55)||(y < 50) || (x < 50)) {
-    //     return;
-    // }                             
-    // printf("Ht_3 d_Ht[%d][%d]: %.5f\n",y,x,d_Ht[y][x]);                         
+                                 * (newVar - var);                    
 };
 
 
@@ -103,21 +86,14 @@ __device__ void customAdd(double* sdata,double* g_odata){
 	if (tid < 4){ sdata[tid] += sdata[tid + 4]; }__syncthreads();
 	if (tid < 2){ sdata[tid] += sdata[tid + 2]; }__syncthreads();
 	if (tid < 1){ sdata[tid] += sdata[tid + 1]; }__syncthreads();
- // __syncthreads(); 
-	// // write result for this block to global mem
+	// write result for this block to global mem
 	if (tid == 0) {atomicAdd(g_odata        , sdata[tid]);}
- // __syncthreads(); 
-	// }
-	//  __syncthreads(); 
-	// __syncthreads();
-	// sdata[tid] = tem;
-	// __syncthreads();
-	// atomicAdd(&g_odata[g_i]        , sdata[tid]);
-}
 
+}
 __global__ void weightedAVG() {
 
-	__shared__ double sdata[TPB_X_TPB];
+	// __shared__ double sdata[TPB_X_TPB];
+	__shared__ double sdata[6][TPB_X_TPB];
 
     int x1 = blockIdx.x*blockDim.x + threadIdx.x;
     int y1 = blockIdx.y*blockDim.y + threadIdx.y;
@@ -128,173 +104,117 @@ __global__ void weightedAVG() {
     int margin = 2;
 
     double sHoGnumber[64] = sHoGNUMBER;
-	double dx1, dy1;
+	double dx1=x1 - CX;
+	double dy1=y1 - CY;
+	bool condition = ((y1 >= margin) && (x1 >= margin) && (y1 < ROW-margin) && (x1 < COL-margin) && d_sHoG1[y1 - margin][x1 - margin] != -1);
 	double t0 = 0;
 	double tx2 = 0;
 	double ty2 = 0;
-	__syncthreads(); 
-    if ((y1 >= ROW-margin) || (x1 >= COL-margin) || (y1 < margin) || (x1 < margin) ) {
-
-    } else {
-    	
-	    dy1 = y1 - CY;
-		dx1 = x1 - CX;
-
-		if (d_sHoG1[y1 - margin][x1 - margin] == -1) {
-
-		} else {
-			int thre = -1;
-
-		    for (int s = 0 ; s < 64 ; s++) {
-		        if (d_sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
-		            thre = s * 3 * (COL - 2 * margin);
-		            break;
-		        }
-		    }
-		    
-		    if (thre == -1) {
-		        //printf("ERROR! \n");
-		    }
-
-			t0     = d_Ht[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
+	int thre = -1;
+    for (int s = 0 ; condition && s < 64 ; s++) {
+        if (d_sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+            thre = s * 3 * (COL - 2 * margin);
+            t0     = d_Ht[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
 		    tx2    = d_Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * d_g_can1[y1][x1];
 		    ty2    = d_Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
-		}
+            break;
+        }
     }
-    __syncthreads(); 
-    sdata[tid]=t0; __syncthreads(); customAdd(sdata,d_g); __syncthreads(); 
- //    if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[0]);
-	// }
-	sdata[tid]=tx2; __syncthreads(); customAdd(sdata,d_g+21); __syncthreads(); 
-	// // if(x1==0&&y1==0){
-	// // 	printf("%.5f ",d_g[1]);
-	// // }
-	sdata[tid]=ty2; __syncthreads(); customAdd(sdata,d_g+22); __syncthreads(); 
-	// // if(x1==0&&y1==0){
-	// // 	printf("%.5f ",d_g[2]);
-	// // }
-	sdata[tid]=t0  * dx1; __syncthreads(); customAdd(sdata,d_g+3); __syncthreads(); 
-	// //   if(x1==0&&y1==0){
-	// // 	printf("%.5f ",d_g[3]);
-	// // }
-	sdata[tid]=t0  * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+4); __syncthreads(); 
-	// //   if(x1==0&&y1==0){
-	// // 	printf("%.5f ",d_g[4]);
-	// // }
-	sdata[tid]=t0  * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+5); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[5]);
-	// }
-	sdata[tid]=t0  * dx1 * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+6); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[6]);
-	// }
-	sdata[tid]=t0  * dy1; __syncthreads(); customAdd(sdata,d_g+7); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[7]);
-	// }
-	sdata[tid]=t0  * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+8); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[8]);
-	// }
-	sdata[tid]=t0  * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+9); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[9]);
-	// }
-	sdata[tid]=t0  * dy1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+10); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[10]);
-	// }
-	sdata[tid]=t0  * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+11); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[11]);
-	// }
-	sdata[tid]=t0  * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+12); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[12]);
-	// }
-	sdata[tid]=t0  * dx1 * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+13); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[13]);
-	// }
-	sdata[tid]=t0  * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+14); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[14]);
-	// }
-	sdata[tid]=t0  * dx1 * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+15); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[15]);
-	// }
-	sdata[tid]=t0  * dx1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+16); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[16]);
-	// }
-	sdata[tid]=tx2 * dx1; __syncthreads(); customAdd(sdata,d_g+17); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[17]);
-	// }
-	sdata[tid]=tx2 * dy1; __syncthreads(); customAdd(sdata,d_g+18); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[18]);
-	// }
-	sdata[tid]=ty2 * dx1; __syncthreads(); customAdd(sdata,d_g+19); __syncthreads(); 
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[19]);
-	// }
-	sdata[tid]=ty2 * dy1; __syncthreads(); customAdd(sdata,d_g+20); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[20]);
-	// }
-	sdata[tid]=tx2 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+23); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[23]);
-	// }
-	sdata[tid]=ty2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+24); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[24]);
-	// }
-	sdata[tid]=tx2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+25); __syncthreads();  
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[25]);
-	// }
-	sdata[tid]=ty2 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+26); __syncthreads();   
-	// if(x1==0&&y1==0){
-	// 	printf("%.5f ",d_g[26]);
-	// }
+	
+    sdata[0][tid]=t0; 
+	sdata[1][tid]=tx2; 
+	sdata[2][tid]=ty2; 
+	sdata[3][tid]=t0  * dx1;
+	sdata[4][tid]=t0  * dx1 * dx1; 
+	sdata[5][tid]=t0  * dx1 * dx1 * dx1; 
+	__syncthreads(); 
+	customAdd(sdata[0],d_g); 
+	customAdd(sdata[1],d_g+21);
+	customAdd(sdata[2],d_g+22);
+	customAdd(sdata[3],d_g+3);
+	customAdd(sdata[4],d_g+4);
+	customAdd(sdata[5],d_g+5);
+	__syncthreads(); 
 
+	sdata[0][tid]=t0  * dx1 * dx1 * dx1 * dx1; 
+	sdata[1][tid]=t0  * dy1; 
+	sdata[2][tid]=t0  * dy1 * dy1; 
+	sdata[3][tid]=t0  * dy1 * dy1 * dy1;  
+	sdata[4][tid]=t0  * dy1 * dy1 * dy1 * dy1; 
+	sdata[5][tid]=t0  * dx1 * dy1; 
+	__syncthreads(); 
+	customAdd(sdata[0],d_g+6);
+	customAdd(sdata[1],d_g+7);
+	customAdd(sdata[2],d_g+8);
+	customAdd(sdata[3],d_g+9);
+	customAdd(sdata[4],d_g+10); 
+	customAdd(sdata[5],d_g+11);
+	__syncthreads(); 
 
-	// d_weightedAVG_data_to_sum[0][y1*COL+x1]=t0;
-	// d_weightedAVG_data_to_sum[21][y1*COL+x1]=tx2;
-	// d_weightedAVG_data_to_sum[22][y1*COL+x1]=ty2;
-	// d_weightedAVG_data_to_sum[3][y1*COL+x1]=t0  * dx1;
-	// d_weightedAVG_data_to_sum[4][y1*COL+x1]=t0  * dx1 * dx1;
-	// d_weightedAVG_data_to_sum[5][y1*COL+x1]=t0  * dx1 * dx1 * dx1;
-	// d_weightedAVG_data_to_sum[6][y1*COL+x1]=t0  * dx1 * dx1 * dx1 * dx1;
-	// d_weightedAVG_data_to_sum[7][y1*COL+x1]=t0  * dy1; 
-	// d_weightedAVG_data_to_sum[8][y1*COL+x1]=t0  * dy1 * dy1; 
-	// d_weightedAVG_data_to_sum[9][y1*COL+x1]=t0  * dy1 * dy1 * dy1; 
-	// d_weightedAVG_data_to_sum[10][y1*COL+x1]=t0  * dy1 * dy1 * dy1 * dy1; 
-	// d_weightedAVG_data_to_sum[11][y1*COL+x1]=t0  * dx1 * dy1; 
-	// d_weightedAVG_data_to_sum[12][y1*COL+x1]=t0  * dx1 * dx1 * dy1; 
-	// d_weightedAVG_data_to_sum[13][y1*COL+x1]=t0  * dx1 * dx1 * dx1 * dy1; 
-	// d_weightedAVG_data_to_sum[14][y1*COL+x1]=t0  * dx1 * dy1 * dy1; 
-	// d_weightedAVG_data_to_sum[15][y1*COL+x1]=t0  * dx1 * dx1 * dy1 * dy1; 
-	// d_weightedAVG_data_to_sum[16][y1*COL+x1]=t0  * dx1 * dy1 * dy1 * dy1; 
-	// d_weightedAVG_data_to_sum[17][y1*COL+x1]=tx2 * dx1; 
-	// d_weightedAVG_data_to_sum[18][y1*COL+x1]=tx2 * dy1;
-	// d_weightedAVG_data_to_sum[19][y1*COL+x1]=ty2 * dx1; 
-	// d_weightedAVG_data_to_sum[20][y1*COL+x1]=ty2 * dy1; 
-	// d_weightedAVG_data_to_sum[23][y1*COL+x1]=tx2 * dx1 * dx1; 
-	// d_weightedAVG_data_to_sum[24][y1*COL+x1]=ty2 * dx1 * dy1; 
-	// d_weightedAVG_data_to_sum[25][y1*COL+x1]=tx2 * dx1 * dy1; 
-	// d_weightedAVG_data_to_sum[26][y1*COL+x1]=ty2 * dy1 * dy1;  
+	sdata[0][tid]=t0  * dx1 * dx1 * dy1; 
+	sdata[1][tid]=t0  * dx1 * dx1 * dx1 * dy1; 
+	sdata[2][tid]=t0  * dx1 * dy1 * dy1; 
+	sdata[3][tid]=t0  * dx1 * dx1 * dy1 * dy1;
+	sdata[4][tid]=t0  * dx1 * dy1 * dy1 * dy1;
+	sdata[5][tid]=tx2 * dx1; 
+	__syncthreads();  
+	customAdd(sdata[0],d_g+12);
+	customAdd(sdata[1],d_g+13);
+	customAdd(sdata[2],d_g+14);
+	customAdd(sdata[3],d_g+15);
+	customAdd(sdata[4],d_g+16);
+	customAdd(sdata[5],d_g+17);
+	__syncthreads();  
 
-	// __syncthreads();
+	sdata[0][tid]=tx2 * dy1; 
+	sdata[1][tid]=ty2 * dx1; 
+	sdata[2][tid]=ty2 * dy1;   
+	sdata[3][tid]=tx2 * dx1 * dx1; 
+	sdata[4][tid]=ty2 * dx1 * dy1;  
+	sdata[5][tid]=tx2 * dx1 * dy1; 
+	__syncthreads();
+	customAdd(sdata[0],d_g+18);
+	customAdd(sdata[1],d_g+19);
+	customAdd(sdata[2],d_g+20);
+	customAdd(sdata[3],d_g+23);
+	customAdd(sdata[4],d_g+24);
+	customAdd(sdata[5],d_g+25);
+	__syncthreads();
 
-	// for(int i=0;i<G_NUM;i++){
-	// 	customAdd(d_weightedAVG_data_to_sum[i],d_g,i);
-	// }
+	sdata[0][tid]=ty2 * dy1 * dy1; 
+	__syncthreads(); 
+	customAdd(sdata[0],d_g+26); 
+	__syncthreads();  
+
+    /*
+    	If use too much shared memory
+
+	    sdata[tid]=t0; __syncthreads(); customAdd(sdata,d_g); __syncthreads(); 
+		sdata[tid]=tx2; __syncthreads(); customAdd(sdata,d_g+21); __syncthreads(); 
+		sdata[tid]=ty2; __syncthreads(); customAdd(sdata,d_g+22); __syncthreads(); 
+		sdata[tid]=t0  * dx1; __syncthreads(); customAdd(sdata,d_g+3); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+4); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+5); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+6); __syncthreads(); 
+		sdata[tid]=t0  * dy1; __syncthreads(); customAdd(sdata,d_g+7); __syncthreads();  
+		sdata[tid]=t0  * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+8); __syncthreads();  
+		sdata[tid]=t0  * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+9); __syncthreads();  
+		sdata[tid]=t0  * dy1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+10); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+11); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+12); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+13); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+14); __syncthreads();  
+		sdata[tid]=t0  * dx1 * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+15); __syncthreads(); 
+		sdata[tid]=t0  * dx1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+16); __syncthreads();  
+		sdata[tid]=tx2 * dx1; __syncthreads(); customAdd(sdata,d_g+17); __syncthreads();  
+		sdata[tid]=tx2 * dy1; __syncthreads(); customAdd(sdata,d_g+18); __syncthreads(); 
+		sdata[tid]=ty2 * dx1; __syncthreads(); customAdd(sdata,d_g+19); __syncthreads(); 
+		sdata[tid]=ty2 * dy1; __syncthreads(); customAdd(sdata,d_g+20); __syncthreads();  
+		sdata[tid]=tx2 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+23); __syncthreads();  
+		sdata[tid]=ty2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+24); __syncthreads();  
+		sdata[tid]=tx2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+25); __syncthreads();  
+		sdata[tid]=ty2 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+26); __syncthreads();   
+	*/
 };
 
 __global__ void cuda_roberts8() {
