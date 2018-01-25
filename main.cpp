@@ -53,6 +53,9 @@ int main() {
 
 	char fileName[128];
 
+
+	cuda_init_parameter();
+
 	/* Initialize the GPT matrix */
 	initGpt(gpt0);
 	initGpt2(gpt1, ZOOM, ZOOM*BETA, B1, B2, ROT);
@@ -91,7 +94,6 @@ int main() {
 	sprintf(fileName, "%s/%s.pgm", IMGDIR, TsIMAGE);
 	load_image_file(fileName, image1, COL2, ROW2);
 
-	cuda_init_parameter(image1);
 
 	for (y = 0; y < ROW2; y++)
 		for (x = 0; x < COL2; x++)

@@ -190,36 +190,6 @@ __global__ void weightedAVG() {
 	__syncthreads(); 
 	customAdd(sdata[0],d_g+26); 
 	__syncthreads();  
-
-    /*
-    	If use too much shared memory
-
-	    sdata[tid]=t0; __syncthreads(); customAdd(sdata,d_g); __syncthreads(); 
-		sdata[tid]=tx2; __syncthreads(); customAdd(sdata,d_g+21); __syncthreads(); 
-		sdata[tid]=ty2; __syncthreads(); customAdd(sdata,d_g+22); __syncthreads(); 
-		sdata[tid]=t0  * dx1; __syncthreads(); customAdd(sdata,d_g+3); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+4); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+5); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dx1 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+6); __syncthreads(); 
-		sdata[tid]=t0  * dy1; __syncthreads(); customAdd(sdata,d_g+7); __syncthreads();  
-		sdata[tid]=t0  * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+8); __syncthreads();  
-		sdata[tid]=t0  * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+9); __syncthreads();  
-		sdata[tid]=t0  * dy1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+10); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+11); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+12); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dx1 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+13); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+14); __syncthreads();  
-		sdata[tid]=t0  * dx1 * dx1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+15); __syncthreads(); 
-		sdata[tid]=t0  * dx1 * dy1 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+16); __syncthreads();  
-		sdata[tid]=tx2 * dx1; __syncthreads(); customAdd(sdata,d_g+17); __syncthreads();  
-		sdata[tid]=tx2 * dy1; __syncthreads(); customAdd(sdata,d_g+18); __syncthreads(); 
-		sdata[tid]=ty2 * dx1; __syncthreads(); customAdd(sdata,d_g+19); __syncthreads(); 
-		sdata[tid]=ty2 * dy1; __syncthreads(); customAdd(sdata,d_g+20); __syncthreads();  
-		sdata[tid]=tx2 * dx1 * dx1; __syncthreads(); customAdd(sdata,d_g+23); __syncthreads();  
-		sdata[tid]=ty2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+24); __syncthreads();  
-		sdata[tid]=tx2 * dx1 * dy1; __syncthreads(); customAdd(sdata,d_g+25); __syncthreads();  
-		sdata[tid]=ty2 * dy1 * dy1; __syncthreads(); customAdd(sdata,d_g+26); __syncthreads();   
-	*/
 };
 
 __global__ void cuda_roberts8() {
@@ -338,7 +308,7 @@ double g[G_NUM];
 dim3 numBlock;
 dim3 numThread;
 
-void cuda_init_parameter(unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
+void cuda_init_parameter(){
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	numThread.x = TPB;
@@ -367,14 +337,28 @@ __global__ void test(){
  //    if ((y >= ROW - 2 * margin) || (x >= 3 * 64 * (COL - 2 * margin))) {
  //        return;
  //    }
+}
 
+void cuda_calc_defcan1(unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE],double g_can1[ROW][COL]){
+	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
+	numBlock.x = iDivUp(COL, TPB);
+	numBlock.y = iDivUp(ROW, TPB);
+	cuda_defcan1<<<numBlock, numThread>>>();
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
+	cuda_defcan2<<<numBlock, numThread>>>();
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 
+	cudaMemcpy(g_can1, d_g_can1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
 }
 
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
 
 	cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
+	// cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
 
