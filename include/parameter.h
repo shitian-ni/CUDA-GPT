@@ -82,7 +82,7 @@
 #define DISTANCETYPE 10
 
 /* Execute parameters */
-#define MAXITER 50				// Maximum iteration times
+#define MAXITER 30				// Maximum iteration times
 #define MAXNR 5					// Maximum Newton-Raphson iterations
 
 /* --------------Fixed parameters-------------- */

@@ -270,16 +270,21 @@ __global__ void cuda_defcan1() {
 					d_image1[y][x]!=WHITE);
 	
 	double this_pixel = condition*(double)d_image1[y][x];
-	d_cuda_defcan_to_sum[0][y*COL+x]=this_pixel;
-	d_cuda_defcan_to_sum[1][y*COL+x]=this_pixel * this_pixel;
-	d_npo_to_sum[y*COL+x]=condition;
+	if(x==30 && y==30)
+	printf("%d %d %.5f\n",x,y,this_pixel);
+	atomicAdd(d_cuda_defcan_vars        , this_pixel);
+	atomicAdd(d_cuda_defcan_vars+1        , this_pixel * this_pixel);
+	atomicAdd(&d_npo        , condition);
+	// d_cuda_defcan_to_sum[0][y*COL+x]=this_pixel;
+	// d_cuda_defcan_to_sum[1][y*COL+x]=this_pixel * this_pixel;
+	// d_npo_to_sum[y*COL+x]=condition;
 
-	__syncthreads();
+	// __syncthreads();
 
-	for(int i=0;i<2;i++){
-		customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars+i);
-	}
-	customAdd(d_npo_to_sum,&d_npo);
+	// for(int i=0;i<2;i++){
+	// 	customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars+i);
+	// }
+	// customAdd(d_npo_to_sum,&d_npo);
 }
 __global__ void cuda_defcan2() {
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -296,6 +301,7 @@ __global__ void cuda_defcan2() {
 	*/
 	__shared__ double s_vars[2];
 	if(threadIdx.x == 0 && threadIdx.y == 0){
+		if(x==0&&y==0)printf("GPU: mean:%.5f  norm:%.5f\n",  d_cuda_defcan_vars[0], d_cuda_defcan_vars[1]);
 		double mean = d_cuda_defcan_vars[0]/ (double)npo;
 		double norm = d_cuda_defcan_vars[1] - (double)npo * mean * mean;
 		if (norm == 0.0) norm = 1.0;
@@ -372,7 +378,7 @@ void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESI
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
 
 	cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
-	// cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
 
