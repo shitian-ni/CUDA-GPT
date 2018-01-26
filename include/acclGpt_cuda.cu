@@ -259,7 +259,6 @@ __global__ void cuda_defcan1() {
     }
 
 	/* definite canonicalization */
-	double ratio; // mean: mean value, norm: normal factor, ratio:
 	int margine = CANMARGIN / 2;
 	int condition = ((x>=margine && y>=margine) && 
 					(x<COL-margine)&&(y<ROW-margine) &&
@@ -304,7 +303,7 @@ __global__ void cuda_defcan2() {
 					d_image1[y][x]!=WHITE);
 	// if(condition==0)return;
 	double ratio = 1.0 / sqrt(s_vars[1]);
-	d_g_can1[y][x] = ratio * ((double)d_image1[y][x] - s_vars[0]);
+	d_g_can1[y][x] = condition * ratio * ((double)d_image1[y][x] - s_vars[0]);
 }
 
 
