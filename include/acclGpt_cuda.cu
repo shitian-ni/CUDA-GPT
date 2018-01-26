@@ -316,6 +316,7 @@ void* d_gk_ptr;void* d_gwt_ptr;void* d_g_can2_ptr;
 void* d_new_cor_ptr;
 void* d_gpt_ptr;
 double g[G_NUM];
+int procImg_No = 1;
 
 dim3 numBlock;
 dim3 numThread;
@@ -407,7 +408,8 @@ __global__ void test(){
 
 void cuda_procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW][COL], char g_HoG[ROW][COL][8], char sHoG[ROW - 4][COL - 4], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
 	cudaMemset(d_cuda_defcan_vars_ptr, 0, 3 * sizeof(double));
-	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
+	if(procImg_No == 1)
+		cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	cuda_defcan1<<<numBlock, numThread>>>();
@@ -416,23 +418,28 @@ void cuda_procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW]
 	cudaMemcpy(g_can, d_g_can1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
 	cudaMemcpy(g_ang, d_g_ang1_ptr, ROW*COL*sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(g_nor, d_g_nor1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
+
+	procImg_No = max(procImg_No+1,2);
 }
 void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
-	cudaMemset(d_cuda_defcan_vars_ptr, 0, 3 * sizeof(double));
-	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
-	numBlock.x = iDivUp(COL, TPB);
-	numBlock.y = iDivUp(ROW, TPB);
-	cuda_defcan1<<<numBlock, numThread>>>();
-	cuda_defcan2<<<numBlock, numThread>>>();
-	cuda_roberts8<<<numBlock, numThread>>>();
-	cudaMemcpy(g_can1, d_g_can1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
+	// cudaMemset(d_cuda_defcan_vars_ptr, 0, 3 * sizeof(double));
+	// // cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
+	// numBlock.x = iDivUp(COL, TPB);
+	// numBlock.y = iDivUp(ROW, TPB);
+	// cuda_defcan1<<<numBlock, numThread>>>();
+	// cuda_defcan2<<<numBlock, numThread>>>();
+	// cuda_roberts8<<<numBlock, numThread>>>();
+	// cudaMemcpy(g_can1, d_g_can1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
 }
 
+int needH = 1;
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
 
 	// cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
+	if(needH)
+		cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
+	needH = max(0,needH-1);
 }
 
 void cuda_Ht(double newVar){
@@ -478,7 +485,7 @@ __device__ void cuda_multiplyVect3x3(double inMat[3][3], double inVect[3], doubl
 __global__ void cuda_calc_bilinear_normal_inverse_projection(int x_size1, int y_size1, int x_size2, int y_size2){
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
-    if ((y >= ROW) || (x >= COL)) {
+    if ((y >= y_size1) || (x >= x_size1)) {
         return;
     }
 	int cx, cy, cx2, cy2;
@@ -529,6 +536,14 @@ __global__ void cuda_calc_bilinear_normal_inverse_projection(int x_size1, int y_
 	}
 }
 
+__global__ void image2_to_image1(){
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+    int y = blockIdx.y*blockDim.y + threadIdx.y;
+    if ((y >= MAX_IMAGESIZE) || (x >= MAX_IMAGESIZE)) {
+        return;
+    }
+    d_image1[y][x] = d_image2[y][x];
+}
 
 void cuda_bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int y_size1, int x_size2, int y_size2,
 		unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE], unsigned char image2[MAX_IMAGESIZE][MAX_IMAGESIZE]) {
@@ -540,4 +555,5 @@ void cuda_bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int 
 
 	cuda_calc_bilinear_normal_inverse_projection<<<numBlock, numThread>>>(x_size1, y_size1, x_size2, y_size2);
 	cudaMemcpy(image2, d_image2_ptr, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+	cudaMemcpy(d_image1_ptr, d_image2_ptr, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost);
 }
