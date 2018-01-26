@@ -210,11 +210,6 @@ __global__ void cuda_roberts8() {
 	/* angle & norm of gradient vector calculated
      by Roberts operator */
 
-	// d_g_ang1[y][x] = -1;
-	// d_g_nor1[y][x] = 0.0;
-
-	// __syncthreads();
-
 	if(y >= ROW-1 || x >= COL-1){
 		d_g_ang1[y][x] = -1;
 		d_g_nor1[y][x] = 0.0;
@@ -250,12 +245,13 @@ __global__ void cuda_roberts8() {
 /*
 	d_cuda_defcan_vars[0]:  mean
 	d_cuda_defcan_vars[1]:  norm
+	d_cuda_defcan_vars[2]:  npo
 */
-__device__ double d_cuda_defcan_vars[2];
-__device__ double d_cuda_defcan_to_sum[2][ROW_X_COL];
-__device__ int d_npo; // number of point
-__device__ int d_npo_to_sum[ROW_X_COL];
+__device__ double d_cuda_defcan_vars[3];
 __global__ void cuda_defcan1() {
+	int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int tid = ty * blockDim.x + tx;
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW) || (x >= COL)) {
@@ -268,23 +264,18 @@ __global__ void cuda_defcan1() {
 	int condition = ((x>=margine && y>=margine) && 
 					(x<COL-margine)&&(y<ROW-margine) &&
 					d_image1[y][x]!=WHITE);
-	
+	// if(condition==0)return;
 	double this_pixel = condition*(double)d_image1[y][x];
-	if(x==30 && y==30)
-	printf("%d %d %.5f\n",x,y,this_pixel);
-	atomicAdd(d_cuda_defcan_vars        , this_pixel);
-	atomicAdd(d_cuda_defcan_vars+1        , this_pixel * this_pixel);
-	atomicAdd(&d_npo        , condition);
-	// d_cuda_defcan_to_sum[0][y*COL+x]=this_pixel;
-	// d_cuda_defcan_to_sum[1][y*COL+x]=this_pixel * this_pixel;
-	// d_npo_to_sum[y*COL+x]=condition;
+	__shared__ double sdata[3][TPB_X_TPB];
+	sdata[0][tid] = this_pixel;
+	sdata[1][tid] = this_pixel*this_pixel;
+	sdata[2][tid] = condition;
 
-	// __syncthreads();
+	__syncthreads();
 
-	// for(int i=0;i<2;i++){
-	// 	customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars+i);
-	// }
-	// customAdd(d_npo_to_sum,&d_npo);
+	customAdd(sdata[0],d_cuda_defcan_vars);
+	customAdd(sdata[1],d_cuda_defcan_vars+1);
+	customAdd(sdata[2],d_cuda_defcan_vars+2);
 }
 __global__ void cuda_defcan2() {
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -294,14 +285,13 @@ __global__ void cuda_defcan2() {
         return;
     }
 
-    int npo = d_npo;
 	/*
 		s_vars[0]:  mean
 		s_vars[1]:  norm
 	*/
 	__shared__ double s_vars[2];
 	if(threadIdx.x == 0 && threadIdx.y == 0){
-		if(x==0&&y==0)printf("GPU: mean:%.5f  norm:%.5f\n",  d_cuda_defcan_vars[0], d_cuda_defcan_vars[1]);
+    	double npo = d_cuda_defcan_vars[2];
 		double mean = d_cuda_defcan_vars[0]/ (double)npo;
 		double norm = d_cuda_defcan_vars[1] - (double)npo * mean * mean;
 		if (norm == 0.0) norm = 1.0;
@@ -312,8 +302,8 @@ __global__ void cuda_defcan2() {
 
 	int condition = ((x<COL-CANMARGIN)&&(y<ROW-CANMARGIN) &&
 					d_image1[y][x]!=WHITE);
-
-	double ratio = condition * 1.0 / sqrt(s_vars[1]);
+	// if(condition==0)return;
+	double ratio = 1.0 / sqrt(s_vars[1]);
 	d_g_can1[y][x] = ratio * ((double)d_image1[y][x] - s_vars[0]);
 }
 
@@ -341,8 +331,7 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1));
 	gpuErrchk( cudaGetSymbolAddress(&d_cuda_defcan_vars_ptr,d_cuda_defcan_vars));
 
-	gpuErrchk( cudaMemset(d_cuda_defcan_vars_ptr, 0, 2 * sizeof(double)));
-
+	
 	gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
@@ -356,35 +345,34 @@ __global__ void test(){
  //    }
 }
 
-void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
-	const int ZERO = 0;
-	cudaMemcpyToSymbol(d_npo,&ZERO,sizeof(int));
-
+void cuda_procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW][COL], char g_HoG[ROW][COL][8], char sHoG[ROW - 4][COL - 4], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
+	cudaMemset(d_cuda_defcan_vars_ptr, 0, 3 * sizeof(double));
 	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	cuda_defcan1<<<numBlock, numThread>>>();
-	gpuErrchk( cudaDeviceSynchronize() );
-    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 	cuda_defcan2<<<numBlock, numThread>>>();
-	gpuErrchk( cudaDeviceSynchronize() );
-    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
-
+	cuda_roberts8<<<numBlock, numThread>>>();
+	cudaMemcpy(g_can, d_g_can1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(g_ang, d_g_ang1_ptr, ROW*COL*sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(g_nor, d_g_nor1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
+}
+void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
+	cudaMemset(d_cuda_defcan_vars_ptr, 0, 3 * sizeof(double));
+	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
+	numBlock.x = iDivUp(COL, TPB);
+	numBlock.y = iDivUp(ROW, TPB);
+	cuda_defcan1<<<numBlock, numThread>>>();
+	cuda_defcan2<<<numBlock, numThread>>>();
+	cuda_roberts8<<<numBlock, numThread>>>();
 	cudaMemcpy(g_can1, d_g_can1_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
 }
 
 void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
 
-	cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_g_can1_ptr, g_can1, ROW*COL*sizeof(double), cudaMemcpyHostToDevice);
+	// cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
-
-	// gpuErrchk( cudaDeviceSynchronize() );
- //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	// gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 
 void cuda_Ht(double newVar){
@@ -412,9 +400,5 @@ double* cuda_calc_g(){
  //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
 	// gpuErrchk( cudaDeviceSynchronize() );
 	cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
-	
-	// for(int i=0;i<G_NUM;i++)
-	// 	cout<<g[i]<<" ";
-	// cout<<endl;
 	return g;
 }
