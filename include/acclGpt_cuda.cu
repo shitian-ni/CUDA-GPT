@@ -13,12 +13,13 @@
 using namespace std;
 
 __device__ double d_H[ROW_H][COL_H], d_Ht[ROW][COL_Ht];
-__device__ unsigned char d_image1[1024][1024];
-__device__ unsigned char d_image2[1024][1024];
+__device__ unsigned char d_image1[MAX_IMAGESIZE][MAX_IMAGESIZE];
+__device__ unsigned char d_image2[MAX_IMAGESIZE][MAX_IMAGESIZE];
 __device__ double d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL], d_gk[ROW][COL], d_gwt[ROW][COL],d_g_can2[ROW][COL];
 __device__ int d_g_ang1[ROW][COL];
 __device__ char d_sHoG1[ROW - 4][COL - 4];
 __device__ double d_new_cor;
+__device__ double d_gpt[3][3];
 
 
 int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
@@ -313,6 +314,7 @@ void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;void* d_sHoG1_ptr;
 void* d_cuda_defcan_vars_ptr;
 void* d_gk_ptr;void* d_gwt_ptr;void* d_g_can2_ptr;
 void* d_new_cor_ptr;
+void* d_gpt_ptr;
 double g[G_NUM];
 
 dim3 numBlock;
@@ -325,6 +327,7 @@ void cuda_init_parameter(){
 	numThread.y = TPB;
 
 	gpuErrchk( cudaGetSymbolAddress(&d_image1_ptr,d_image1));
+	gpuErrchk( cudaGetSymbolAddress(&d_image2_ptr,d_image2));
 	gpuErrchk( cudaGetSymbolAddress(&d_H_ptr,d_H));
 	gpuErrchk( cudaGetSymbolAddress(&d_Ht_ptr,d_Ht));
 	gpuErrchk( cudaGetSymbolAddress(&d_g_ptr,d_g));
@@ -337,6 +340,7 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaGetSymbolAddress(&d_gwt_ptr,d_gwt));
 	gpuErrchk( cudaGetSymbolAddress(&d_g_can2_ptr,d_g_can2));
 	gpuErrchk( cudaGetSymbolAddress(&d_new_cor_ptr, d_new_cor) );
+	gpuErrchk( cudaGetSymbolAddress(&d_gpt_ptr, d_gpt) );
 	
 	gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
@@ -457,4 +461,83 @@ double* cuda_calc_g(){
 	// gpuErrchk( cudaDeviceSynchronize() );
 	cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
 	return g;
+}
+
+__device__ void cuda_multiplyVect3x3(double inMat[3][3], double inVect[3], double outVect[3]) {
+	int i, j;
+	double sum;
+	for(i = 0 ; i < 3 ; ++i) {
+		sum = 0.0;
+		for(j = 0 ; j < 3 ; ++j) {
+			sum += inMat[i][j] * inVect[j];
+		}
+		outVect[i] = sum;
+	}
+}
+
+__global__ void cuda_calc_bilinear_normal_inverse_projection(int x_size1, int y_size1, int x_size2, int y_size2){
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+    int y = blockIdx.y*blockDim.y + threadIdx.y;
+    if ((y >= ROW) || (x >= COL)) {
+        return;
+    }
+	int cx, cy, cx2, cy2;
+    if (y_size1 == ROW) {
+		cx  = CX,  cy  = CY;
+		cx2 = CX2, cy2 = CY2;
+	} else {
+		cx  = CX2, cy  = CY2;
+		cx2 = CX,  cy2 = CY;
+	}
+
+    double inVect[3], outVect[3];
+	double x_new, y_new, x_frac, y_frac;
+	double gray_new;
+	int m, n;
+	
+	inVect[2] = 1.0;
+	inVect[1] = y - cy;
+	inVect[0] = x - cx;
+
+	int i, j;
+	double sum;
+	for(i = 0 ; i < 3 ; ++i) {
+		sum = 0.0;
+		for(j = 0 ; j < 3 ; ++j) {
+			sum += d_gpt[i][j] * inVect[j];
+		}
+		outVect[i] = sum;
+	}
+
+	x_new = outVect[0] / outVect[2] + cx2;
+	y_new = outVect[1] / outVect[2] + cy2;
+	m = (int)floor(x_new);
+	n = (int)floor(y_new);
+	x_frac = x_new - m;
+	y_frac = y_new - n;
+
+	if (m >= 0 && m+1 < x_size2 && n >= 0 && n+1 < y_size2) {
+		gray_new = (1.0 - y_frac) * ((1.0 - x_frac) * d_image1[n][m] + x_frac * d_image1[n][m+1])
+		 + y_frac * ((1.0 - x_frac) * d_image1[n+1][m] + x_frac * d_image1[n+1][m+1]);
+		d_image2[y][x] = (unsigned char)gray_new;
+	} else {
+	#ifdef BACKGBLACK
+		d_image2[y][x] = BLACK;
+	#else
+		d_image2[y][x] = WHITE;
+	#endif
+	}
+}
+
+
+void cuda_bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int y_size1, int x_size2, int y_size2,
+		unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE], unsigned char image2[MAX_IMAGESIZE][MAX_IMAGESIZE]) {
+	/* inverse projection transformation of the image by bilinear interpolation */
+	numBlock.x = iDivUp(x_size1, TPB);
+	numBlock.y = iDivUp(y_size1, TPB);
+	cudaMemcpy(d_image1_ptr,image1,MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char),cudaMemcpyHostToDevice);
+	cudaMemcpy(d_gpt_ptr,gpt,3*3*sizeof(double),cudaMemcpyHostToDevice);
+
+	cuda_calc_bilinear_normal_inverse_projection<<<numBlock, numThread>>>(x_size1, y_size1, x_size2, y_size2);
+	cudaMemcpy(image2, d_image2_ptr, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost);
 }

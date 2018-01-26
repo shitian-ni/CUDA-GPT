@@ -438,7 +438,11 @@ void bilinear_normal_projection(double gpt[3][3], int x_size1, int y_size1, int 
 	/* projection transformation of the image by bilinear interpolation */
 	double inv_gpt[3][3];
 	inverse3x3(gpt, inv_gpt);
-	bilinear_normal_inverse_projection(inv_gpt, x_size1, y_size1, x_size2, y_size2, image1, image2);
+	#if isGPU == 0
+		bilinear_normal_inverse_projection(inv_gpt, x_size1, y_size1, x_size2, y_size2, image1, image2);
+	#elif isGPU == 1
+		cuda_bilinear_normal_inverse_projection(inv_gpt, x_size1, y_size1, x_size2, y_size2, image1, image2);
+	#endif
 }
 
 void bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int y_size1, int x_size2, int y_size2,

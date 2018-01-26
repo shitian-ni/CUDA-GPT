@@ -7,3 +7,5 @@ void cuda_procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW]
 void init_gk_and_g_can2(double gk[ROW][COL],double g_can2[ROW][COL]);
 void calc_gwt(double var,double gwt[ROW][COL]);
 double calc_new_cor1();
+void cuda_bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int y_size1, int x_size2, int y_size2,
+		unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE], unsigned char image2[MAX_IMAGESIZE][MAX_IMAGESIZE]);
