@@ -20,6 +20,8 @@ __device__ int d_g_ang1[ROW][COL];
 __device__ char d_sHoG1[ROW - 4][COL - 4];
 
 
+
+
 int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
 
 //https://stackoverflow.com/a/14038590
@@ -71,7 +73,8 @@ __global__ void Ht_3(int count, double newVar) {
 
 //1000 times 1200~1300ms
 //http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/projects/reduction/doc/reduction.pdf
-__device__ void customAdd(double* sdata,double* g_odata){
+template<typename T>
+__device__ void customAdd(T* sdata,T* g_odata){
  	int tx = threadIdx.x;
     int ty = threadIdx.y;
     int tid = ty * blockDim.x + tx;
@@ -250,6 +253,8 @@ __global__ void cuda_roberts8() {
 */
 __device__ double d_cuda_defcan_vars[2];
 __device__ double d_cuda_defcan_to_sum[2][ROW_X_COL];
+__device__ int d_npo; // number of point
+__device__ int d_npo_to_sum[ROW_X_COL];
 __global__ void cuda_defcan1() {
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -259,18 +264,22 @@ __global__ void cuda_defcan1() {
 
 	/* definite canonicalization */
 	double ratio; // mean: mean value, norm: normal factor, ratio:
-	int npo; // number of point
-	npo = (ROW - 2 * MARGINE) * (COL - 2 * MARGINE);
+	int margine = CANMARGIN / 2;
+	int condition = ((x>=margine && y>=margine) && 
+					(x<COL-margine)&&(y<ROW-margine) &&
+					d_image1[y][x]!=WHITE);
 	
-	double this_pixel = (double)d_image1[y][x];
+	double this_pixel = condition*(double)d_image1[y][x];
 	d_cuda_defcan_to_sum[0][y*COL+x]=this_pixel;
 	d_cuda_defcan_to_sum[1][y*COL+x]=this_pixel * this_pixel;
+	d_npo_to_sum[y*COL+x]=condition;
 
 	__syncthreads();
 
 	for(int i=0;i<2;i++){
 		customAdd(d_cuda_defcan_to_sum[i],d_cuda_defcan_vars+i);
 	}
+	customAdd(d_npo_to_sum,&d_npo);
 }
 __global__ void cuda_defcan2() {
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -280,8 +289,7 @@ __global__ void cuda_defcan2() {
         return;
     }
 
-    int npo; // number of point
-	npo = (ROW - 2 * MARGINE) * (COL - 2 * MARGINE);
+    int npo = d_npo;
 	/*
 		s_vars[0]:  mean
 		s_vars[1]:  norm
@@ -296,7 +304,10 @@ __global__ void cuda_defcan2() {
 	}
 	__syncthreads();
 
-	double ratio = 1.0 / sqrt(s_vars[1]);
+	int condition = ((x<COL-CANMARGIN)&&(y<ROW-CANMARGIN) &&
+					d_image1[y][x]!=WHITE);
+
+	double ratio = condition * 1.0 / sqrt(s_vars[1]);
 	d_g_can1[y][x] = ratio * ((double)d_image1[y][x] - s_vars[0]);
 }
 
@@ -339,7 +350,10 @@ __global__ void test(){
  //    }
 }
 
-void cuda_calc_defcan1(unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE],double g_can1[ROW][COL]){
+void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
+	const int ZERO = 0;
+	cudaMemcpyToSymbol(d_npo,&ZERO,sizeof(int));
+
 	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);

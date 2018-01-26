@@ -6,11 +6,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <iostream>
 
 #include "parameter.h"
 #include "utility.h"
 #include "stdGpt.h"
-// #include "gpuGpt.h"
+#include "acclGpt_cuda.h"
+
+using namespace std;
 
 void  procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW][COL], char g_HoG[ROW][COL][8], char sHoG[ROW - 4][COL - 4], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]);
 void  roberts8(int g_ang[ROW][COL], double g_nor[ROW][COL], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]);
@@ -71,7 +74,7 @@ void  procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW][COL
     	}
     	cout<<endl;
     }
-    cuda_calc_defcan1(image1,g_can);
+    cuda_calc_defcan1(g_can,image1);
     cout<<"GPU"<<endl;
     for(int i=5;i<7;i++){
     	for(int j=5;j<7;j++){
