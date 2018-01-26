@@ -67,36 +67,9 @@ void  procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW][COL
 #elif isGPU == 1
     // Shitian NI
  	cuda_procImg(g_can, g_ang, g_nor, g_HoG, sHoG, image1);
- //    cuda_calc_defcan1(g_can,image1);
- //    cout<<"GPU"<<endl;
- //    for(int i=0;i<ROW;i++){
- //    	for(int j=0;j<COL;j++){
- //    		printf("%.3f ",g_can[i][j]);
- //    		cout<<g_can[i][j]<<" ";
- //    	}
- //    	cout<<endl;
- //    }
- //    defcan2(g_can, image1);				/* canonicalization */
- //    cout<<"CPU: "<<endl;
- //    for(int i=0;i<ROW;i++){
- //    	for(int j=0;j<COL;j++){
- //    		cout<<g_can[i][j]<<" ";
- //    	}
- //    	cout<<endl;
- //    }
-	// roberts8(g_ang, g_nor, image1);		/* 8-quantization of gradient dir */
-	calHoG(g_ang, g_HoG);				/* calculate sHOG pattern */
+	// calHoG(g_ang, g_HoG);				 calculate sHOG pattern 
 	smplHoG64(sHoG, g_ang, g_nor);		/* Numberring the sHOG pattern to sHoGNUMBER */
 #endif
-//     #elif isGPU == 1
-//     // Shitian NI
-//     // cuda_procImg(g_can, g_ang, g_nor, g_HoG, sHoG, image1);
-//     defcan2(g_can, image1);
-//     // cuda_calc_defcan1(g_can,image1);
-// 	roberts8(g_ang, g_nor, image1);		 /*8-quantization of gradient dir */
-// 	calHoG(g_ang, g_HoG);				/* calculate sHOG pattern */
-// 	smplHoG64(sHoG, g_ang, g_nor);		/* Numberring the sHOG pattern to sHoGNUMBER */
-// #endif
 }
 
 void roberts8(int g_ang[ROW][COL], double g_nor[ROW][COL], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]) {

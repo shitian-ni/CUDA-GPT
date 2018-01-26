@@ -90,6 +90,8 @@ int main() {
     loadTemp64_far(H3);
 #endif
 
+    init_gk_and_g_can2(gk,g_can2);
+
 	/* Load test image and save it to image3, the local memory */
 	sprintf(fileName, "%s/%s.pgm", IMGDIR, TsIMAGE);
 	load_image_file(fileName, image1, COL2, ROW2);
@@ -150,8 +152,6 @@ int main() {
 	/* lap the start time */
 	start = clock();
 	for (iter = 0 ; iter < MAXITER ; iter++) {
-
-
 		/* Calculation distance */
 		switch (DISTANCETYPE) {
 		case 0:
@@ -182,9 +182,13 @@ int main() {
 
 		/* update gauss window function */
 		var = pow(WGT * dnn, 2);
-		for (y = 0; y < ROW; y++)
-			for (x = 0; x < COL; x++)
-				gwt[y][x] = pow(gk[y][x], 1.0 / var);
+		#if isGPU == 0
+			for (y = 0; y < ROW; y++)
+				for (x = 0; x < COL; x++)
+					gwt[y][x] = pow(gk[y][x], 1.0 / var);
+		#elif isGPU == 1
+			calc_gwt(var, gwt);
+		#endif
 
 		/* select matching method */
 		switch (MATCHMETHOD) {
@@ -214,12 +218,17 @@ int main() {
 		procImg(g_can1, g_ang1, g_nor1, g_HoG1, sHoG1, image2);
 
 		/* update correlation */
-		new_cor1 = 0.0;
-		for (y = MARGINE ; y < ROW - MARGINE ; y++){
-			for (x = MARGINE ; x < COL - MARGINE ; x++){
-				new_cor1 += g_can1[y][x] * g_can2[y][x];
+		#if isGPU == 0
+			new_cor1 = 0.0;
+			for (y = MARGINE ; y < ROW - MARGINE ; y++){
+				for (x = MARGINE ; x < COL - MARGINE ; x++){
+					new_cor1 += g_can1[y][x] * g_can2[y][x];
+				}
 			}
-		}
+		#elif isGPU == 1
+			new_cor1 = calc_new_cor1();
+		#endif
+		
 
 		/* display message */
 		printf("iter = %d, new col. = %f dnn = %f  var = %f\n", iter, new_cor1, dnn, 1 / var);

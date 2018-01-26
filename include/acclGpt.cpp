@@ -962,7 +962,6 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
         cuda_update_parameter(g_ang1, g_can1, H,sHoG1);
         cuda_Ht(newVar);
         g = cuda_calc_g();
-        
     } else {
         if (newVar > 1.0) {
             for (y = 0 ; y < ROW - 2 * margin ; y++) {

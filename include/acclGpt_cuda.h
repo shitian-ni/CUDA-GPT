@@ -4,3 +4,6 @@ void cuda_Ht(double newVar);
 double* cuda_calc_g();
 void cuda_calc_defcan1(double g_can1[ROW][COL],unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]);
 void cuda_procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW][COL], char g_HoG[ROW][COL][8], char sHoG[ROW - 4][COL - 4], unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]);
+void init_gk_and_g_can2(double gk[ROW][COL],double g_can2[ROW][COL]);
+void calc_gwt(double var,double gwt[ROW][COL]);
+double calc_new_cor1();

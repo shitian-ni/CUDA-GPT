@@ -15,11 +15,10 @@ using namespace std;
 __device__ double d_H[ROW_H][COL_H], d_Ht[ROW][COL_Ht];
 __device__ unsigned char d_image1[1024][1024];
 __device__ unsigned char d_image2[1024][1024];
-__device__ double d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL];
+__device__ double d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL], d_gk[ROW][COL], d_gwt[ROW][COL],d_g_can2[ROW][COL];
 __device__ int d_g_ang1[ROW][COL];
 __device__ char d_sHoG1[ROW - 4][COL - 4];
-
-
+__device__ double d_new_cor;
 
 
 int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
@@ -307,9 +306,13 @@ __global__ void cuda_defcan2() {
 	d_g_can1[y][x] = ratio * ((double)d_image1[y][x] - s_vars[0]);
 }
 
+
+
 void* d_image1_ptr; void* d_image2_ptr; void* d_H_ptr;void*  d_Ht_ptr;void*  d_g_ptr;
 void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;void* d_sHoG1_ptr;
 void* d_cuda_defcan_vars_ptr;
+void* d_gk_ptr;void* d_gwt_ptr;void* d_g_can2_ptr;
+void* d_new_cor_ptr;
 double g[G_NUM];
 
 dim3 numBlock;
@@ -330,11 +333,64 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1));
 	gpuErrchk( cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1));
 	gpuErrchk( cudaGetSymbolAddress(&d_cuda_defcan_vars_ptr,d_cuda_defcan_vars));
-
+	gpuErrchk( cudaGetSymbolAddress(&d_gk_ptr,d_gk));
+	gpuErrchk( cudaGetSymbolAddress(&d_gwt_ptr,d_gwt));
+	gpuErrchk( cudaGetSymbolAddress(&d_g_can2_ptr,d_g_can2));
+	gpuErrchk( cudaGetSymbolAddress(&d_new_cor_ptr, d_new_cor) );
 	
 	gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
+}
+
+void init_gk_and_g_can2(double gk[ROW][COL],double g_can2[ROW][COL]){
+	cudaMemcpy(d_gk_ptr, gk, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_g_can2_ptr, g_can2, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
+}
+
+__global__ void cuda_calc_gwt(double var){
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+    int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if ((y >= ROW) || (x >= COL)) {
+        return;
+    }
+
+	d_gwt[y][x] = pow(d_gk[y][x], 1.0 / var);
+}
+void calc_gwt(double var,double gwt[ROW][COL]){
+	numBlock.x = iDivUp(COL, TPB);
+	numBlock.y = iDivUp(ROW, TPB);
+	cuda_calc_gwt<<<numBlock, numThread>>>(var);
+	cudaMemcpy(gwt, d_gwt_ptr, ROW*COL*sizeof(double), cudaMemcpyDeviceToHost);
+}
+
+
+__global__ void cuda_calc_new_cor1() {
+	int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int tid = ty * blockDim.x + tx;
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+    int y = blockIdx.y*blockDim.y + threadIdx.y;
+    if ((y >= ROW) || (x >= COL)) {
+        return;
+    }
+
+	__shared__ double sdata[TPB_X_TPB];
+	sdata[tid] = d_g_can1[y][x]*d_g_can2[y][x];
+
+	__syncthreads();
+
+	customAdd(sdata,&d_new_cor);
+}
+double calc_new_cor1(){
+	gpuErrchk( cudaMemset(d_new_cor_ptr,0,sizeof(double)) );
+	numBlock.x = iDivUp(COL, TPB);
+	numBlock.y = iDivUp(ROW, TPB);
+	cuda_calc_new_cor1<<<numBlock, numThread>>>();
+	double new_cor;
+	cudaMemcpy(&new_cor, d_new_cor_ptr, sizeof(double), cudaMemcpyDeviceToHost);
+	return new_cor;
 }
 
 __global__ void test(){
