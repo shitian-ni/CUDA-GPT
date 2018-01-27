@@ -959,7 +959,7 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 	/* Linear interpolation */
 
     if(isGPU){
-        cuda_update_parameter(g_ang1, g_can1, H,sHoG1);
+        cuda_update_parameter(sHoG1);
         cuda_Ht(newVar);
         g = cuda_calc_g();
     } else {

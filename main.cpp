@@ -90,7 +90,12 @@ int main() {
     loadTemp64_far(H3);
 #endif
 
-    init_gk_and_g_can2_and_H2(gk,g_can2,H2);
+    init_gk_and_g_can2(gk,g_can2);
+
+    #if DATATYPE == 2
+    	init_H(H2);
+    #endif
+
 
 	/* Load test image and save it to image3, the local memory */
 	sprintf(fileName, "%s/%s.pgm", IMGDIR, TsIMAGE);

@@ -347,11 +347,12 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 
-void init_gk_and_g_can2_and_H2(double gk[ROW][COL],double g_can2[ROW][COL],double H2[ROW - 4][(COL - 4) * 6 * 64 * 3]){
+void init_gk_and_g_can2(double gk[ROW][COL],double g_can2[ROW][COL]){
 	cudaMemcpy(d_gk_ptr, gk, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_g_can2_ptr, g_can2, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_H_ptr, H2, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
-	// needH = 0;
+}
+void init_H(double H[ROW_H][COL_H]){
+	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
 }
 
 __global__ void cuda_calc_gwt(double var){
@@ -434,13 +435,8 @@ void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESI
 }
 
 int needH = 1;
-void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double H[ROW_H][COL_H],char sHoG1[ROW - 4][COL - 4]){
-
-	// cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
+void cuda_update_parameter(char sHoG1[ROW - 4][COL - 4]){
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
-	// if(needH)
-	// 	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
-	// needH = max(0,needH-1);
 }
 
 void cuda_Ht(double newVar){
@@ -525,36 +521,35 @@ __global__ void cuda_calc_bilinear_normal_inverse_projection(int x_size1, int y_
 	y_frac = y_new - n;
 
 	if (m >= 0 && m+1 < x_size2 && n >= 0 && n+1 < y_size2) {
-		gray_new = (1.0 - y_frac) * ((1.0 - x_frac) * d_image1[n][m] + x_frac * d_image1[n][m+1])
-		 + y_frac * ((1.0 - x_frac) * d_image1[n+1][m] + x_frac * d_image1[n+1][m+1]);
-		d_image2[y][x] = (unsigned char)gray_new;
+		gray_new = (1.0 - y_frac) * ((1.0 - x_frac) * d_image2[n][m] + x_frac * d_image2[n][m+1])
+		 + y_frac * ((1.0 - x_frac) * d_image2[n+1][m] + x_frac * d_image2[n+1][m+1]);
+		d_image1[y][x] = (unsigned char)gray_new;
 	} else {
 	#ifdef BACKGBLACK
-		d_image2[y][x] = BLACK;
+		d_image1[y][x] = BLACK;
 	#else
-		d_image2[y][x] = WHITE;
+		d_image1[y][x] = WHITE;
 	#endif
 	}
 }
 
-__global__ void image2_to_image1(){
-	int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int y = blockIdx.y*blockDim.y + threadIdx.y;
-    if ((y >= MAX_IMAGESIZE) || (x >= MAX_IMAGESIZE)) {
-        return;
-    }
-    d_image1[y][x] = d_image2[y][x];
-}
+// __global__ void image2_to_image1(){
+// 	int x = blockIdx.x*blockDim.x + threadIdx.x;
+//     int y = blockIdx.y*blockDim.y + threadIdx.y;
+//     if ((y >= MAX_IMAGESIZE) || (x >= MAX_IMAGESIZE)) {
+//         return;
+//     }
+//     d_image1[y][x] = d_image2[y][x];
+// }
 
 void cuda_bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int y_size1, int x_size2, int y_size2,
 		unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE], unsigned char image2[MAX_IMAGESIZE][MAX_IMAGESIZE]) {
 	/* inverse projection transformation of the image by bilinear interpolation */
 	numBlock.x = iDivUp(x_size1, TPB);
 	numBlock.y = iDivUp(y_size1, TPB);
-	cudaMemcpy(d_image1_ptr,image1,MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char),cudaMemcpyHostToDevice);
+	cudaMemcpy(d_image2_ptr,image1,MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char),cudaMemcpyHostToDevice);
 	cudaMemcpy(d_gpt_ptr,gpt,3*3*sizeof(double),cudaMemcpyHostToDevice);
 
 	cuda_calc_bilinear_normal_inverse_projection<<<numBlock, numThread>>>(x_size1, y_size1, x_size2, y_size2);
-	cudaMemcpy(image2, d_image2_ptr, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost);
-	cudaMemcpy(d_image1_ptr, d_image2_ptr, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+	cudaMemcpy(image2, d_image1_ptr, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost);
 }
