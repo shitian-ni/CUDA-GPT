@@ -231,15 +231,15 @@ __global__ void cuda_roberts8() {
 		return;
 	} 
 	angle = atan2(delta_LD, delta_RD);
-	if (     angle >  7.0 / 8.0 * PI) d_g_ang1[y][x] = 5;
-	else if (angle >  5.0 / 8.0 * PI) d_g_ang1[y][x] = 4;
-	else if (angle >  3.0 / 8.0 * PI) d_g_ang1[y][x] = 3;
-	else if (angle >  1.0 / 8.0 * PI) d_g_ang1[y][x] = 2;
-	else if (angle > -1.0 / 8.0 * PI) d_g_ang1[y][x] = 1;
-	else if (angle > -3.0 / 8.0 * PI) d_g_ang1[y][x] = 0;
-	else if (angle > -5.0 / 8.0 * PI) d_g_ang1[y][x] = 7;
-	else if (angle > -7.0 / 8.0 * PI) d_g_ang1[y][x] = 6;
-	else d_g_ang1[y][x] = 5;	
+	if (     angle * 8.0 >  7.0 * PI) {d_g_ang1[y][x] = 5; return;}
+	if (angle * 8.0 >  5.0 * PI) {d_g_ang1[y][x] = 4; return;}
+	if (angle * 8.0 >  3.0 * PI) {d_g_ang1[y][x] = 3; return;}
+	if (angle * 8.0 >  1.0 * PI) {d_g_ang1[y][x] = 2; return;}
+	if (angle * 8.0 > -1.0 * PI) {d_g_ang1[y][x] = 1; return;}
+	if (angle * 8.0 > -3.0 * PI) {d_g_ang1[y][x] = 0; return;}
+	if (angle * 8.0 > -5.0 * PI) {d_g_ang1[y][x] = 7; return;}
+	if (angle * 8.0 > -7.0 * PI) {d_g_ang1[y][x] = 6; return;}
+	d_g_ang1[y][x] = 5;	
 }
 
 /*
@@ -347,9 +347,11 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 
-void init_gk_and_g_can2(double gk[ROW][COL],double g_can2[ROW][COL]){
+void init_gk_and_g_can2_and_H2(double gk[ROW][COL],double g_can2[ROW][COL],double H2[ROW - 4][(COL - 4) * 6 * 64 * 3]){
 	cudaMemcpy(d_gk_ptr, gk, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_g_can2_ptr, g_can2, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_H_ptr, H2, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
+	// needH = 0;
 }
 
 __global__ void cuda_calc_gwt(double var){
@@ -388,7 +390,7 @@ __global__ void cuda_calc_new_cor1() {
 	customAdd(sdata,&d_new_cor);
 }
 double calc_new_cor1(){
-	gpuErrchk( cudaMemset(d_new_cor_ptr,0,sizeof(double)) );
+	cudaMemset(d_new_cor_ptr,0,sizeof(double));
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	cuda_calc_new_cor1<<<numBlock, numThread>>>();
@@ -436,9 +438,9 @@ void cuda_update_parameter(int g_ang1[ROW][COL], double g_can1[ROW][COL],double 
 
 	// cudaMemcpy(d_g_ang1_ptr, g_ang1, ROW*COL*sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
-	if(needH)
-		cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
-	needH = max(0,needH-1);
+	// if(needH)
+	// 	cudaMemcpy(d_H_ptr, H, ROW_H*COL_H*sizeof(double), cudaMemcpyHostToDevice);
+	// needH = max(0,needH-1);
 }
 
 void cuda_Ht(double newVar){

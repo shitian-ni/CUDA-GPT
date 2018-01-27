@@ -90,7 +90,7 @@ int main() {
     loadTemp64_far(H3);
 #endif
 
-    init_gk_and_g_can2(gk,g_can2);
+    init_gk_and_g_can2_and_H2(gk,g_can2,H2);
 
 	/* Load test image and save it to image3, the local memory */
 	sprintf(fileName, "%s/%s.pgm", IMGDIR, TsIMAGE);
@@ -237,5 +237,6 @@ int main() {
 	/* display the calculation time */
 	end = clock();
 	elapse = (double)(end - start) / CLOCKS_PER_SEC;
-	printf("\nelapsed time = %.3f sec\n\n", elapse);
+	string device = isGPU?"GPU":"CPU";
+	printf("\n%s elapsed time = %.3f sec\n\n", device.c_str(),elapse);
 }

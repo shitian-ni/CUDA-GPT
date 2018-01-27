@@ -33,7 +33,7 @@
  0: use CPU to calculate defcan, roberts8, calHoG, and smpHoG64
  1: use GPU to calculate defcan, roberts8, calHoG, and smpHoG64
  */
-#define isGPU 0
+#define isGPU 1
 
 /* CUDA parameters */
 #define TPB 32
