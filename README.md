@@ -1,12 +1,18 @@
 # Accelerated GPT in CUDA
 
 ## Usage
+
+### Compile and Execute
 ```
 nvcc *.cpp include/*.c* -o cu.out  -arch=sm_60
 ```
 Tested on Tokyo Tech TSUBAME 3.0
  - Nvidia Tesla P100
  - Cuda compilation tools, release 8.0, V8.0.61
+
+### Accelerated Computations
+Modify `#define MAKETEMP 0`to `#define MAKETEMP 1` for table generations. Compile and execute.
+Then change back to `#define MAKETEMP 0`.
 
 ## Reference
 ```
