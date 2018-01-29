@@ -92,9 +92,9 @@ int main() {
 
     init_gk_and_g_can2(gk,g_can2);
 
-    #if DATATYPE == 2
-    	init_H(H2);
-    #endif
+    init_H1(H1);
+    init_H2(H2);
+    init_H3(H3);
 
 
 	/* Load test image and save it to image3, the local memory */
@@ -114,6 +114,8 @@ int main() {
 	sprintf(fileName, "%s/%s_init.pgm", IMGDIR, RgIMAGE);
 	save_image_file(fileName, image2, COL, ROW);
 	procImg(g_can1, g_ang1, g_nor1, g_HoG1, sHoG1, image2);
+
+	
 
 	/***************Pre-setting finish***************/
     
@@ -146,9 +148,9 @@ int main() {
 		dnn = fsHoGpat(sHoG1, sHoG2, D2, ndis, coor);
 		break;
 	case 10:
-		dnn = fwinpat(g_ang1, g_ang2, D1, ndis, coor);
-		if (dnn > DNNSWITCHTHRE)
-			dnn = fsHoGpat(sHoG1, sHoG2, D2, ndis, coor);
+		dnn = fsHoGpat(sHoG1, sHoG2, D2, ndis, coor);
+		if (dnn <= DNNSWITCHTHRE)
+			dnn = fwinpat(g_ang1, g_ang2, D1, ndis, coor);
 		break;
 	}
 
@@ -157,6 +159,59 @@ int main() {
 	/* lap the start time */
 	start = clock();
 	for (iter = 0 ; iter < MAXITER ; iter++) {
+		
+
+		/* update gauss window function */
+		var = pow(WGT * dnn, 2);
+		#if isGPU == 0
+			for (y = 0; y < ROW; y++)
+				for (x = 0; x < COL; x++)
+					gwt[y][x] = pow(gk[y][x], 1.0 / var);
+		#elif isGPU == 1
+			calc_gwt(var, gwt);
+		#endif
+
+		/* select matching method */
+		switch (MATCHMETHOD) {
+		case 1:
+			break;
+		case 6:
+			nsgptcor(g_ang1, g_can1, g_ang2, g_can2, gwt, gpt1, dnn);
+			break;
+		case 7:
+			nsgptcorSpHOG5x5(g_ang1, sHoG1, g_can1,	g_ang2, sHoG2, g_can2, gwt, gpt1, dnn);
+			break;
+		case 16:
+			fnsgptcor(g_ang1, g_can1, gpt1, dnn, H1, Ht1);
+			break;
+		case 17:
+			if(dnn < 8.0)
+				fnsgptcorSpHOG5x5(g_ang1, sHoG1, g_can1, gpt1, dnn, H2, Ht2);
+			else
+				fnsgptcorSpHOG5x5_far(g_ang1, sHoG1, g_can1, gpt1, dnn, H3, Ht3);
+		}
+
+
+		/* transform the test image and update g_can1, g_ang1, g_nor1, g_HoG1, sHoG1 */
+		for (y = 0; y < ROW2; y++)
+			for (x = 0; x < COL2; x++)
+				image1[y][x] = (unsigned char)image3[y][x];
+		bilinear_normal_projection(gpt1, COL, ROW, COL2, ROW2, image1, image2);
+
+		procImg(g_can1, g_ang1, g_nor1, g_HoG1, sHoG1, image2);
+
+		/* update correlation */
+		#if isGPU == 0
+			new_cor1 = 0.0;
+			for (y = MARGINE ; y < ROW - MARGINE ; y++){
+				for (x = MARGINE ; x < COL - MARGINE ; x++){
+					new_cor1 += g_can1[y][x] * g_can2[y][x];
+				}
+			}
+		#elif isGPU == 1
+			new_cor1 = calc_new_cor1();
+		#endif
+		
 		/* Calculation distance */
 		switch (DISTANCETYPE) {
 		case 0:
@@ -184,56 +239,6 @@ int main() {
 				dnn = fsHoGpat(sHoG1, sHoG2, D2, ndis, coor);
 			break;
 		}
-
-		/* update gauss window function */
-		var = pow(WGT * dnn, 2);
-		#if isGPU == 0
-			for (y = 0; y < ROW; y++)
-				for (x = 0; x < COL; x++)
-					gwt[y][x] = pow(gk[y][x], 1.0 / var);
-		#elif isGPU == 1
-			calc_gwt(var, gwt);
-		#endif
-
-		/* select matching method */
-		switch (MATCHMETHOD) {
-		case 1:
-			break;
-		case 6:
-			nsgptcor(g_ang1, g_can1, g_ang2, g_can2, gwt, gpt1, dnn);
-			break;
-		case 7:
-			nsgptcorSpHOG5x5(g_ang1, sHoG1, g_can1,	g_ang2, sHoG2, g_can2, gwt, gpt1, dnn);
-			break;
-		case 16:
-			fnsgptcor(g_ang1, g_can1, gpt1, dnn, H1, Ht1);
-			break;
-		case 17:
-			fnsgptcorSpHOG5x5(g_ang1, sHoG1, g_can1, gpt1, dnn, H2, Ht2);
-			// fnsgptcorSpHOG5x5_far(g_ang1, sHoG1, g_can1, gpt1, dnn, H3, Ht3);
-		}
-
-
-		/* transform the test image and update g_can1, g_ang1, g_nor1, g_HoG1, sHoG1 */
-		for (y = 0; y < ROW2; y++)
-			for (x = 0; x < COL2; x++)
-				image1[y][x] = (unsigned char)image3[y][x];
-		bilinear_normal_projection(gpt1, COL, ROW, COL2, ROW2, image1, image2);
-
-		procImg(g_can1, g_ang1, g_nor1, g_HoG1, sHoG1, image2);
-
-		/* update correlation */
-		#if isGPU == 0
-			new_cor1 = 0.0;
-			for (y = MARGINE ; y < ROW - MARGINE ; y++){
-				for (x = MARGINE ; x < COL - MARGINE ; x++){
-					new_cor1 += g_can1[y][x] * g_can2[y][x];
-				}
-			}
-		#elif isGPU == 1
-			new_cor1 = calc_new_cor1();
-		#endif
-		
 
 		/* display message */
 		printf("iter = %d, new col. = %f dnn = %f  var = %f\n", iter, new_cor1, dnn, 1 / var);

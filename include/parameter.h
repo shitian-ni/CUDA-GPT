@@ -71,6 +71,19 @@
 #define gx1y1 g[28]
 #define gy1y1 g[29]
 
+
+#define ROW_H1 (ROW)
+#define COL_H1 (COL * 162)
+#define COL_Ht1 (COL * 27)
+
+#define ROW_H2 (ROW-4)
+#define COL_H2 ((COL - 4) * 6 * 64 * 3)
+#define COL_Ht2 ((COL - 4) * 64 * 3)
+
+#define ROW_H3 (ROW-4)
+#define COL_H3 ((COL - 4) * 6 * 64 * 3)
+#define COL_Ht3 ((COL - 4) * 64 * 3)
+
 /* switch template table type 
  0: automatical selection of the type of window size
  1: for 8-quantized gradient directions
@@ -92,7 +105,7 @@
 #define NOHoG			8		// The threshold of non HoG feature
 #define SHoGTHRE        400.0   // The first direction should over this value
 #define SHoGSECONDTHRE	0.5		// The threshold of the second direction of the simplified HoG pattern
-#define DNNSWITCHTHRE	3.0		// The threshold of switch the method of dnn calculation
+#define DNNSWITCHTHRE	2.0		// The threshold of switch the method of dnn calculation
 #define PI 3.141592654			// value of pi
 #define EPS 0.000001         	// like zero
 #define EPS2 0.000001           // like zero2
@@ -110,7 +123,7 @@
 
 /* initial conditions */
 #define NONELEMENT				/* use non-elemental matrix as initial condition */
-#define ZOOM			2.0		/* Zoom rate for initial matrix */
+#define ZOOM			1.7		/* Zoom rate for initial matrix */
 #define BETA			1.0		/* Relation between alpha and beta */
 #define ROT				0.0		/* Rotation angle for initial matrix */
 #define B1				0.0		/*  */
@@ -158,9 +171,6 @@
 #define ROW 136           /* Vertical   size of image  */
 #define COL2 340          /* Horizontal size of image  */
 #define ROW2 272          /* Vertical   size of image  */
-#define ROW_H (ROW-4)
-#define COL_H ((COL - 4) * 6 * 64 * 3)
-#define COL_Ht ((COL - 4) * 64 * 3)
 #define CX  85
 #define CY  68
 #define CX2  170

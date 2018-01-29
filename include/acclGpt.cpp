@@ -687,7 +687,7 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
     return (dnn1 + dnn2)/2.0;
 }
 
-void fnsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL], double gpt[3][3], double dnn, double H[ROW][COL * 162], double Ht[ROW][COL * 27]) {
+void fnsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL], double gpt[3][3], double dnn, double H1[ROW][COL * 162], double Ht1[ROW][COL * 27]) {
 	// double H[ROW][COL * 162], Ht[ROW][COL * 27];
 	double var[6] = VARTABLE;
 	double newVar;
@@ -711,77 +711,98 @@ void fnsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL], double gpt[3][3], 
 	printf("newVar = %f\n", newVar);
 
 	/* Linear interpolation */
+    if(isGPU){
+        // cuda_update_parameter(sHoG1);
+        cuda_Ht(newVar,1,1);
+        g = cuda_calc_g(1);
+    } else {
 
-	if (newVar > 1.0) {
-		for (y = 0 ; y < ROW ; y++) {
-			for (x = 0 ; x < 27 * COL ; x++) {
-					Ht[y][x] =  H[y][x + COL * 27 * 5];
-			}
-		}
-	} else if (newVar < 1.0 / 32.0) {
-		for (y = 0 ; y < ROW ; y++) {
-			for (x = 0 ; x < 27 * COL ; x++) {
-					Ht[y][x] =  H[y][x];
-			}
-		}
-	} else {
-		count = floor(log2(newVar)) + 5;
-		for (y = 0 ; y < ROW ; y++) {
-			for (x = 0 ; x < 27 * COL ; x++) {
-					Ht[y][x] =  H[y][x + COL * 27 * count] + (H[y][x + COL * 27 * (count + 1)] - H[y][x + COL * 27 * count]) / (var[count + 1] - var[count]) * (newVar - var[count]);
-					// printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
-			}
-		}
-	}
+    	if (newVar > 1.0) {
+    		for (y = 0 ; y < ROW ; y++) {
+    			for (x = 0 ; x < 27 * COL ; x++) {
+    					Ht1[y][x] =  H1[y][x + COL * 27 * 5];
+    			}
+    		}
+    	} else if (newVar < 1.0 / 32.0) {
+    		for (y = 0 ; y < ROW ; y++) {
+    			for (x = 0 ; x < 27 * COL ; x++) {
+    					Ht1[y][x] =  H1[y][x];
+    			}
+    		}
+    	} else {
+    		count = floor(log2(newVar)) + 5;
+    		for (y = 0 ; y < ROW ; y++) {
+    			for (x = 0 ; x < 27 * COL ; x++) {
+    					Ht1[y][x] =  H1[y][x + COL * 27 * count] + (H1[y][x + COL * 27 * (count + 1)] - H1[y][x + COL * 27 * count]) / (var[count + 1] - var[count]) * (newVar - var[count]);
+    					// printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
+    			}
+    		}
+    	}
 
-	/* Gaussian weigthed mean values */
-	g0 = gx2 = gy2 = 0.0;
-	gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
-	gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
-	gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
-	gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
-	for (y1 = MARGINE ; y1 < ROW - MARGINE ; y1++) {
-		dy1 = y1 - CY;
-		for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
-			dx1 = x1 - CX;
+    	/* Gaussian weigthed mean values */
+    	g0 = gx2 = gy2 = 0.0;
+    	gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
+    	gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
+    	gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
+    	gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
+    	for (y1 = MARGINE ; y1 < ROW - MARGINE ; y1++) {
+    		dy1 = y1 - CY;
+    		for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
+    			dx1 = x1 - CX;
 
-			if (g_ang1[y1][x1] == -1) continue;
+    			if (g_ang1[y1][x1] == -1) continue;
 
-			thre = (g_ang1[y1][x1] + 1) * 3 * COL;
+    			thre = (g_ang1[y1][x1] + 1) * 3 * COL;
 
-			t0     = Ht[y1][thre + x1]           * g_can1[y1][x1];
-			tx2    = Ht[y1][thre + x1 + COL]     * g_can1[y1][x1];
-			ty2    = Ht[y1][thre + x1 + COL * 2] * g_can1[y1][x1];
+                /*
+                if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
 
-            // printf("(%d %d) t0 = %f \n", y1, x1, t0);
+                thre = -1;
+                for (s = 0 ; s < 64 ; s++) {
+                    if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+                        thre = s * 3 * (COL - 2 * margin);
+                        break;
+                    }
+                }
+                if (thre == -1) {
+                    printf("ERROR! \n");
+                }
+                */
 
-			g0        += t0;
-			gx2       += tx2;
-			gy2       += ty2;
-			gx1p1     += t0  * dx1;
-			gx1p2     += t0  * dx1 * dx1;
-			gx1p3     += t0  * dx1 * dx1 * dx1;
-			gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
-			gy1p1     += t0  * dy1;
-			gy1p2     += t0  * dy1 * dy1;
-			gy1p3     += t0  * dy1 * dy1 * dy1;
-			gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
-			gx1p1y1p1 += t0  * dx1 * dy1;
-			gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
-			gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
-			gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
-			gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
-			gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
-			gx1x2     += tx2 * dx1;
-			gy1x2     += tx2 * dy1;
-			gx1y2     += ty2 * dx1;
-			gy1y2     += ty2 * dy1;
-			gx1p2x2   += tx2 * dx1 * dx1;
-			gx1y1y2   += ty2 * dx1 * dy1;
-			gx1y1x2   += tx2 * dx1 * dy1;
-			gy1p2y2   += ty2 * dy1 * dy1;
-		}
-	}
+    			t0     = Ht1[y1][thre + x1]           * g_can1[y1][x1];
+    			tx2    = Ht1[y1][thre + x1 + COL]     * g_can1[y1][x1];
+    			ty2    = Ht1[y1][thre + x1 + COL * 2] * g_can1[y1][x1];
+
+                // printf("(%d %d) t0 = %f \n", y1, x1, t0);
+
+    			g0        += t0;
+    			gx2       += tx2;
+    			gy2       += ty2;
+    			gx1p1     += t0  * dx1;
+    			gx1p2     += t0  * dx1 * dx1;
+    			gx1p3     += t0  * dx1 * dx1 * dx1;
+    			gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
+    			gy1p1     += t0  * dy1;
+    			gy1p2     += t0  * dy1 * dy1;
+    			gy1p3     += t0  * dy1 * dy1 * dy1;
+    			gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
+    			gx1p1y1p1 += t0  * dx1 * dy1;
+    			gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
+    			gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
+    			gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
+    			gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
+    			gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
+    			gx1x2     += tx2 * dx1;
+    			gy1x2     += tx2 * dy1;
+    			gx1y2     += ty2 * dx1;
+    			gy1y2     += ty2 * dy1;
+    			gx1p2x2   += tx2 * dx1 * dx1;
+    			gx1y1y2   += ty2 * dx1 * dy1;
+    			gx1y1x2   += tx2 * dx1 * dy1;
+    			gy1p2y2   += ty2 * dy1 * dy1;
+    		}
+    	}
+    }
 
     // printf("g0 = %f\n", g0);
 
@@ -932,7 +953,7 @@ void fnsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL], double gpt[3][3], 
 }
 
 void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], double g_can1[ROW][COL],
-                     double gpt[3][3], double dnn, double H[ROW - 4][(COL - 4) * 6 * 64 * 3], double Ht[ROW - 4][(COL - 4) * 64 * 3]) {
+                     double gpt[3][3], double dnn, double H2[ROW - 4][(COL - 4) * 6 * 64 * 3], double Ht2[ROW - 4][(COL - 4) * 64 * 3]) {
 	// double H[ROW - 4][(COL - 4) * 6 * 64 * 3], Ht[ROW - 4][(COL - 4) * 64 * 3];
 	double var[6] = VARTABLE;
 	double newVar;
@@ -960,27 +981,27 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 
     if(isGPU){
         cuda_update_parameter(sHoG1);
-        cuda_Ht(newVar);
-        g = cuda_calc_g();
+        cuda_Ht(newVar,1,2);
+        g = cuda_calc_g(2);
     } else {
         if (newVar > 1.0) {
             for (y = 0 ; y < ROW - 2 * margin ; y++) {
                 for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-                        Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * 5];
+                        Ht2[y][x] =  H2[y][x + (COL - 2 * margin) * 3 * 64 * 5];
                 }
             }
         } else if (newVar < 1.0 / 32.0) {
             for (y = 0 ; y < ROW - 2 * margin ; y++) {
                 for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-                        Ht[y][x] =  H[y][x];
+                        Ht2[y][x] =  H2[y][x];
                 }
             }
         } else {
             count = floor(log2(newVar)) + 5;
             for (y = 0 ; y < ROW - 2 * margin ; y++) {
                 for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-                        Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
-                                   (H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - H[y][x + (COL - 2 * margin) * 3 * 64 * count])
+                        Ht2[y][x] =  H2[y][x + (COL - 2 * margin) * 3 * 64 * count] +
+                                   (H2[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - H2[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var[count + 1] - var[count])
                                  * (newVar - var[count]);
                         // printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
@@ -1013,11 +1034,15 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
                     printf("ERROR! \n");
                 }
 
-                t0     = Ht[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
-                tx2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
-                ty2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
+                t0     = Ht2[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
+                tx2    = Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
+                ty2    = Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
 
                 // printf("(%d %d) t0 = %f \n", y1, x1, t0);
+
+                // if(y1==92 && x1 < 20){
+                //     printf("CPU: %d %d:  t0 - %.5f d_Ht2 - %.5f  d_g_can1 - %.5f\n",x1,y1,t0, Ht2[y1 - margin][thre + x1 - margin], g_can1[y1][x1]);
+                // }
 
                 g0        += t0;
                 gx2       += tx2;
@@ -1206,7 +1231,7 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 }
 
 void fnsgptcorSpHOG5x5_far(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], double g_can1[ROW][COL],
-                     double gpt[3][3], double dnn, double H[ROW - 4][(COL - 4) * 6 * 64 * 3], double Ht[ROW - 4][(COL - 4) * 64 * 3]) {
+                     double gpt[3][3], double dnn, double H3[ROW - 4][(COL - 4) * 6 * 64 * 3], double Ht3[ROW - 4][(COL - 4) * 64 * 3]) {
 	// double H[ROW - 4][(COL - 4) * 6 * 64 * 3], Ht[ROW - 4][(COL - 4) * 64 * 3];
 	double var[6] = VARTABLE2;
 	double newVar;
@@ -1231,89 +1256,95 @@ void fnsgptcorSpHOG5x5_far(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], d
 
 	/* Linear interpolation */
 
-	if (newVar > var[5]) {
-		for (y = 0 ; y < ROW - 2 * margin ; y++) {
-			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-					Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * 5];
-			}
-		}
-	} else if (newVar < var[0]) {
-		for (y = 0 ; y < ROW - 2 * margin ; y++) {
-			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-					Ht[y][x] =  H[y][x];
-			}
-		}
-	} else {
-		count = floor(log2(newVar)) + 10;
-		printf("count = %d\n", count);
-		for (y = 0 ; y < ROW - 2 * margin ; y++) {
-			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
-					Ht[y][x] =  H[y][x + (COL - 2 * margin) * 3 * 64 * count] +
-							   (H[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - H[y][x + (COL - 2 * margin) * 3 * 64 * count])
-							 / (var[count + 1] - var[count])
-							 * (newVar - var[count]);
-					// printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
-			}
-		}
-	}
+    if(isGPU){
+        cuda_update_parameter(sHoG1);
+        cuda_Ht(newVar,2,3);
+        g = cuda_calc_g(3);
+    } else {
+    	if (newVar > var[5]) {
+    		for (y = 0 ; y < ROW - 2 * margin ; y++) {
+    			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
+    					Ht3[y][x] =  H3[y][x + (COL - 2 * margin) * 3 * 64 * 5];
+    			}
+    		}
+    	} else if (newVar < var[0]) {
+    		for (y = 0 ; y < ROW - 2 * margin ; y++) {
+    			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
+    					Ht3[y][x] =  H3[y][x];
+    			}
+    		}
+    	} else {
+    		count = floor(log2(newVar)) + 10;
+    		printf("count = %d\n", count);
+    		for (y = 0 ; y < ROW - 2 * margin ; y++) {
+    			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
+    					Ht3[y][x] =  H3[y][x + (COL - 2 * margin) * 3 * 64 * count] +
+    							   (H3[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - H3[y][x + (COL - 2 * margin) * 3 * 64 * count])
+    							 / (var[count + 1] - var[count])
+    							 * (newVar - var[count]);
+    					// printf("Ht = %f H[count] = %f H[count + 1] = %f \n", Ht[y][x], H[y][x + COL * 27 * count], H[y][x + COL * 27 * (count + 1)]);
+    			}
+    		}
+    	}
 
-	/* Gaussian weigthed mean values */
-	g0 = gx2 = gy2 = 0.0;
-	gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
-	gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
-	gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
-	gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
-	for (y1 = margin ; y1 < ROW - margin ; y1++) {
-		dy1 = y1 - CY;
-		for (x1 = margin ; x1 < COL - margin ; x1++) {
-			dx1 = x1 - CX;
+    	/* Gaussian weigthed mean values */
+    	g0 = gx2 = gy2 = 0.0;
+    	gx1p1 = gx1p2 = gx1p3 = gx1p4 = gy1p1 = gy1p2 = gy1p3 = gy1p4 = 0.0;
+    	gx1p1y1p1 = gx1p2y1p1 = gx1p3y1p1 = gx1p1y1p2 = gx1p2y1p2 = gx1p1y1p3 = 0.0;
+    	gx1x2 = gx1y2 = gy1x2 = gy1y2 = 0.0;
+    	gx1p2x2 = gx1y1y2 = gx1y1x2 = gy1p2y2 = 0.0;
+    	for (y1 = margin ; y1 < ROW - margin ; y1++) {
+    		dy1 = y1 - CY;
+    		for (x1 = margin ; x1 < COL - margin ; x1++) {
+    			dx1 = x1 - CX;
 
-			if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
+    			if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
 
-			thre = -1;
-			for (s = 0 ; s < 64 ; s++) {
-				if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
-					thre = s * 3 * (COL - 2 * margin);
-					break;
-				}
-			}
-			if (thre == -1) {
-				printf("ERROR! \n");
-			}
+    			thre = -1;
+    			for (s = 0 ; s < 64 ; s++) {
+    				if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+    					thre = s * 3 * (COL - 2 * margin);
+    					break;
+    				}
+    			}
+    			if (thre == -1) {
+    				printf("ERROR! \n");
+    			}
 
-			t0     = Ht[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
-			tx2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
-			ty2    = Ht[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
+    			t0     = Ht3[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
+    			tx2    = Ht3[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
+    			ty2    = Ht3[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
 
-            // printf("(%d %d) t0 = %f \n", y1, x1, t0);
+                // printf("(%d %d) t0 = %f \n", y1, x1, t0);
 
-			g0        += t0;
-			gx2       += tx2;
-			gy2       += ty2;
-			gx1p1     += t0  * dx1;
-			gx1p2     += t0  * dx1 * dx1;
-			gx1p3     += t0  * dx1 * dx1 * dx1;
-			gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
-			gy1p1     += t0  * dy1;
-			gy1p2     += t0  * dy1 * dy1;
-			gy1p3     += t0  * dy1 * dy1 * dy1;
-			gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
-			gx1p1y1p1 += t0  * dx1 * dy1;
-			gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
-			gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
-			gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
-			gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
-			gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
-			gx1x2     += tx2 * dx1;
-			gy1x2     += tx2 * dy1;
-			gx1y2     += ty2 * dx1;
-			gy1y2     += ty2 * dy1;
-			gx1p2x2   += tx2 * dx1 * dx1;
-			gx1y1y2   += ty2 * dx1 * dy1;
-			gx1y1x2   += tx2 * dx1 * dy1;
-			gy1p2y2   += ty2 * dy1 * dy1;
-		}
-	}
+    			g0        += t0;
+    			gx2       += tx2;
+    			gy2       += ty2;
+    			gx1p1     += t0  * dx1;
+    			gx1p2     += t0  * dx1 * dx1;
+    			gx1p3     += t0  * dx1 * dx1 * dx1;
+    			gx1p4     += t0  * dx1 * dx1 * dx1 * dx1;
+    			gy1p1     += t0  * dy1;
+    			gy1p2     += t0  * dy1 * dy1;
+    			gy1p3     += t0  * dy1 * dy1 * dy1;
+    			gy1p4     += t0  * dy1 * dy1 * dy1 * dy1;
+    			gx1p1y1p1 += t0  * dx1 * dy1;
+    			gx1p2y1p1 += t0  * dx1 * dx1 * dy1;
+    			gx1p3y1p1 += t0  * dx1 * dx1 * dx1 * dy1;
+    			gx1p1y1p2 += t0  * dx1 * dy1 * dy1;
+    			gx1p2y1p2 += t0  * dx1 * dx1 * dy1 * dy1;
+    			gx1p1y1p3 += t0  * dx1 * dy1 * dy1 * dy1;
+    			gx1x2     += tx2 * dx1;
+    			gy1x2     += tx2 * dy1;
+    			gx1y2     += ty2 * dx1;
+    			gy1y2     += ty2 * dy1;
+    			gx1p2x2   += tx2 * dx1 * dx1;
+    			gx1y1y2   += ty2 * dx1 * dy1;
+    			gx1y1x2   += tx2 * dx1 * dy1;
+    			gy1p2y2   += ty2 * dy1 * dy1;
+    		}
+    	}
+    }
 
     // printf("g0 = %f\n", g0);
 
