@@ -58,10 +58,9 @@ __global__ void Ht1_2() {
     d_Ht1[y][x] =  d_H1[y][x];   
 };
 __global__ void Ht1_3(int count, double newVar, int VarTableNo) {
-	int margin = 2;
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
-    if ((y >= ROW - 2 * margin) || (x >= 3 * 64 * (COL - 2 * margin))) {
+    if ((y >= ROW_H1) || (x >= COL_Ht1)) {
         return;
     }
     double var_p_1 = pow(2.0,count + 1 -5 - (VarTableNo-1)*5) ;
@@ -79,7 +78,6 @@ __global__ void Ht2_1() {
     }
 
     d_Ht2[y][x] =  d_H2[y][x + (COL - 2 * margin) * 3 * 64 * 5];
-    // printf("Ht2_1  %d %d: d_Ht2 - %.5f  d_H2 - %.5f\n",x,y,d_Ht2[y][x], d_H2[y][x + (COL - 2 * margin) * 3 * 64 * 5]);
 };
 __global__ void Ht2_2() {
 	int margin = 2;
@@ -90,7 +88,6 @@ __global__ void Ht2_2() {
     }
 
     d_Ht2[y][x] =  d_H2[y][x];   
-    // printf("Ht2_2   %d %d: d_Ht2 - %.5f  d_H2 - %.5f\n",x,y,d_Ht2[y][x], d_H2[y][x]);
 };
 __global__ void Ht2_3(int count, double newVar, int VarTableNo) {
 	int margin = 2;
@@ -104,11 +101,7 @@ __global__ void Ht2_3(int count, double newVar, int VarTableNo) {
     d_Ht2[y][x] = d_H2[y][x + (COL - 2 * margin) * 3 * 64 * count] +
                                    (d_H2[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H2[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var_p_1 - var)
-                                 * (newVar - var);      
-    // printf("Ht2_3    %d %d: d_Ht2 - %.5f  d_H2 - %.5f\n",x,y,d_Ht2[y][x], d_H2[y][x + (COL - 2 * margin) * 3 * 64 * count] +
-    //                                (d_H2[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H2[y][x + (COL - 2 * margin) * 3 * 64 * count])
-    //                              / (var_p_1 - var)
-    //                              * (newVar - var));              
+                                 * (newVar - var);                 
 };
 
 __global__ void Ht3_1() {
@@ -120,7 +113,6 @@ __global__ void Ht3_1() {
     }
 
     d_Ht3[y][x] =  d_H3[y][x + (COL - 2 * margin) * 3 * 64 * 5];
-    // printf("Ht3_1   %d %d: d_Ht3 - %.5f  d_H3 - %.5f\n",x,y,d_Ht3[y][x], d_H3[y][x + (COL - 2 * margin) * 3 * 64 * 5]);
 };
 __global__ void Ht3_2() {
 	int margin = 2;
@@ -131,7 +123,6 @@ __global__ void Ht3_2() {
     }
 
     d_Ht3[y][x] =  d_H3[y][x];   
-    // printf("Ht3_2   %d %d: d_Ht3 - %.5f  d_H3 - %.5f\n",x,y,d_Ht3[y][x], d_H3[y][x]);
 };
 __global__ void Ht3_3(int count, double newVar, int VarTableNo) {
 	int margin = 2;
@@ -145,11 +136,7 @@ __global__ void Ht3_3(int count, double newVar, int VarTableNo) {
     d_Ht3[y][x] = d_H3[y][x + (COL - 2 * margin) * 3 * 64 * count] +
                                    (d_H3[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H3[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var_p_1 - var)
-                                 * (newVar - var);       
-    // printf("Ht3_3    %d %d: d_Ht3 - %.5f  d_H3 - %.5f\n",x,y,d_Ht3[y][x], d_H3[y][x + (COL - 2 * margin) * 3 * 64 * count] +
-    //                                (d_H3[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H3[y][x + (COL - 2 * margin) * 3 * 64 * count])
-    //                              / (var_p_1 - var)
-    //                              * (newVar - var));                     
+                                 * (newVar - var);                      
 };
 
 
@@ -196,8 +183,6 @@ __global__ void weightedAVG(int calc_g_type) {
 	double tx2 = 0;
 	double ty2 = 0;
 	int thre = -1;
-
-	// printf("%d %d: condition: %d   d_sHoG1[y1 - margin][x1 - margin]: %d\n",x1,y1,condition,d_sHoG1[y1 - margin][x1 - margin]==-1);
 
 	if(calc_g_type == 0){
 		if (d_g_ang1[y1][x1] == -1) return;
@@ -554,13 +539,10 @@ void cuda_update_parameter(char sHoG1[ROW - 4][COL - 4]){
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
 }
 
-void cuda_Ht(double newVar, int VarTableNo,int H_No){
-	int margin = 2;
-	numBlock.x = iDivUp(3 * 64 * (COL - 2 * margin), TPB);
-	numBlock.y = iDivUp(ROW - 2 * margin, TPB);
-
-	// cout<<"H_No: "<<H_No<<endl;
+void cuda_Ht(double newVar, int VarTableNo,int H_No){	
 	if(H_No == 1){
+		numBlock.x = iDivUp(COL_Ht1, TPB);
+		numBlock.y = iDivUp(ROW_H1, TPB);
 		if (newVar > 1.0) {
 			Ht1_1<<<numBlock, numThread>>>();
 		}else if (newVar < 1.0 / 32.0) {
@@ -570,6 +552,8 @@ void cuda_Ht(double newVar, int VarTableNo,int H_No){
 			Ht1_3<<<numBlock, numThread>>>(count, newVar, VarTableNo);
 		}
 	} else if(H_No == 2){
+		numBlock.x = iDivUp(COL_Ht2, TPB);
+		numBlock.y = iDivUp(ROW_H2, TPB);
 		if (newVar > 1.0) {
 			Ht2_1<<<numBlock, numThread>>>();
 		}else if (newVar < 1.0 / 32.0) {
@@ -579,6 +563,8 @@ void cuda_Ht(double newVar, int VarTableNo,int H_No){
 			Ht2_3<<<numBlock, numThread>>>(count, newVar, VarTableNo);
 		}
 	} else if(H_No == 3){
+		numBlock.x = iDivUp(COL_Ht3, TPB);
+		numBlock.y = iDivUp(ROW_H3, TPB);
 		double var[6] = VARTABLE2;
 		if (newVar > var[5]) {
 			Ht3_1<<<numBlock, numThread>>>();
@@ -589,10 +575,6 @@ void cuda_Ht(double newVar, int VarTableNo,int H_No){
 			Ht3_3<<<numBlock, numThread>>>(count, newVar, VarTableNo);
 		}
 	} 
-
-	// gpuErrchk( cudaDeviceSynchronize() );
- //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	// gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 double* cuda_calc_g(int calc_g_type){
 	// cout<<"calc_g_type: "<<calc_g_type<<endl;
@@ -600,9 +582,6 @@ double* cuda_calc_g(int calc_g_type){
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	weightedAVG<<<numBlock, numThread>>>(calc_g_type);
-	// gpuErrchk( cudaPeekAtLastError() );
- //    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
-	// gpuErrchk( cudaDeviceSynchronize() );
 	cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
 	return g;
 }
@@ -672,15 +651,6 @@ __global__ void cuda_calc_bilinear_normal_inverse_projection(int x_size1, int y_
 	#endif
 	}
 }
-
-// __global__ void image2_to_image1(){
-// 	int x = blockIdx.x*blockDim.x + threadIdx.x;
-//     int y = blockIdx.y*blockDim.y + threadIdx.y;
-//     if ((y >= MAX_IMAGESIZE) || (x >= MAX_IMAGESIZE)) {
-//         return;
-//     }
-//     d_image1[y][x] = d_image2[y][x];
-// }
 
 void cuda_bilinear_normal_inverse_projection(double gpt[3][3], int x_size1, int y_size1, int x_size2, int y_size2,
 		unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE], unsigned char image2[MAX_IMAGESIZE][MAX_IMAGESIZE]) {

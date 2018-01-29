@@ -996,6 +996,7 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
                         Ht2[y][x] =  H2[y][x];
                 }
             }
+
         } else {
             count = floor(log2(newVar)) + 5;
             for (y = 0 ; y < ROW - 2 * margin ; y++) {
@@ -1037,7 +1038,9 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
                 t0     = Ht2[y1 - margin][thre + x1 - margin]                          * g_can1[y1][x1];
                 tx2    = Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * g_can1[y1][x1];
                 ty2    = Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * g_can1[y1][x1];
-
+                // if(x1==50)
+                //     printf("%d %d: Ht2: %.5f   g_can1: %.5f\n",x1,y1,Ht2[y1 - margin][thre + x1 - margin],g_can1[y1][x1]);
+                
                 // printf("(%d %d) t0 = %f \n", y1, x1, t0);
 
                 // if(y1==92 && x1 < 20){
@@ -1072,13 +1075,6 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
             }
         }
     }
-
-	
-    // for(int i=0;i<G_NUM;i++){
-    //     cout<<g[i]<<" ";
-    // }
-    // cout<<endl;
-	
 
     // printf("g0 = %f\n", g0);
 
@@ -1275,7 +1271,7 @@ void fnsgptcorSpHOG5x5_far(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], d
     		}
     	} else {
     		count = floor(log2(newVar)) + 10;
-    		printf("count = %d\n", count);
+    		// printf("count = %d\n", count);
     		for (y = 0 ; y < ROW - 2 * margin ; y++) {
     			for (x = 0 ; x < 3 * 64 * (COL - 2 * margin) ; x++) {
     					Ht3[y][x] =  H3[y][x + (COL - 2 * margin) * 3 * 64 * count] +
