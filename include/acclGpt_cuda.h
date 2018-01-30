@@ -8,7 +8,7 @@ void cuda_procImg(double g_can[ROW][COL], int g_ang[ROW][COL], double g_nor[ROW]
 void copy_initial_parameters(double gk[ROW][COL],double g_can2[ROW][COL],double H1[ROW_H1][COL_H1],double H2[ROW_H2][COL_H2],double H3[ROW_H3][COL_H3],
 	double D1[ROW][COL * 8], double D2[ROW - 4][(COL - 4) * 64],char sHoG2[ROW - 4][COL - 4],double ndis[(2 * ROW - 1) * (2 * COL - 1)],
 int coor[(2 * ROW - 1) * (2 * COL - 1)][2]);
-double cuda_fsHoGpat();
+double cuda_fsHoGpat(char sHoG1[ROW - 4][COL - 4]);
 
 void calc_gwt(double var,double gwt[ROW][COL]);
 double calc_new_cor1();

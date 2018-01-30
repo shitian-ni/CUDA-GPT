@@ -631,7 +631,7 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
     /* calculation of mean of nearest-neighbor interpoint distances */
     /* with the same angle code between two images */
     if(isGPU){
-        return cuda_fsHoGpat();
+        return cuda_fsHoGpat(sHoG1);
     } else {
 
         double min, minInit, delta, dnn1, dnn2;
@@ -650,6 +650,9 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
         dnn1 = 0.0;
         for (y1 = margin ; y1 < ROW - margin; y1++) {
             for (x1 = margin ; x1 < COL - margin ; x1++) {
+                if(x1==30&&y1==60)
+                    printf("sHoG1[y1 - margin][x1 - margin]: %d\n",sHoG1[y1 - margin][x1 - margin]);
+                    // cout<<"sHoG1[y1 - margin][x1 - margin]: "<<sHoG1[y1 - margin][x1 - margin]<<endl;
                 if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
                 for (s = 0 ; s < 64 ; s++) {
                     if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
@@ -664,6 +667,9 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
                 if (delta < min) min = delta;
                 // printf("angCode = %d, (%d, %d) nn1 = %f (%d)\n", angcode, x1, y1, min, sHoG1[y1 - margin][x1 - margin]);
                 dnn1 += min;
+                if(x1==30&&y1==60)
+    //printf("%d %d %.5f %.5f\n",x,y,min_1,min_2);
+                cout<<"min1: "<<min<<endl;
                 // printf("angCode = %d, (%d, %d) nn1 = %f (%d) \n", angcode, x1, y1, dnn1, sHoGnum);
             }
         }
@@ -694,6 +700,9 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
                     // printf("y1 = %d\n", y1);
                     break;
                 }
+                if(x2==30&&y2==60)
+    // printf("%d %d %.5f %.5f\n",x,y,min_1,min_2);
+                cout<<"min2: "<<min<<endl;
                 dnn2 += min;
             }
         }
