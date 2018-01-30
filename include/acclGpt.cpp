@@ -631,19 +631,29 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
     /* calculation of mean of nearest-neighbor interpoint distances */
     /* with the same angle code between two images */
     double min, minInit, delta, dnn1, dnn2;
-    int x1, y1, x2, y2;
-    int angcode;
+    double sHoGnumber[64] = sHoGNUMBER;
+    int x1, y1, x2, y2, s;
+    int angcode, angcode2;
     int count1, count2, sHoGnum, sHoGidx;
     int margin = 2;
+    // clock_t start, end;
+    // double elapse = 0.0;
 
     minInit = sqrt((ROW - 2 * margin) * (ROW - 2 * margin) + (COL - 2 * margin) * (COL - 2 * margin));
     /* from the 1st image */
+    // start = clock();
     count1 = 0;
     dnn1 = 0.0;
     for (y1 = margin ; y1 < ROW - margin; y1++) {
         for (x1 = margin ; x1 < COL - margin ; x1++) {
-        	if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
-            angcode = sHoG2Idx(sHoG1[y1 - margin][x1 - margin]);
+            if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
+            for (s = 0 ; s < 64 ; s++) {
+                if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+                    angcode = s;
+                    break;
+                }
+            }
+            // angcode = sHoG2Idx(sHoG1[y1 - margin][x1 - margin]);
             count1++;
             min = minInit;
             delta = D[y1 - margin][x1 - margin + (COL - 2 * margin) * angcode];
@@ -654,33 +664,39 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
         }
     }
     dnn1 /= (double)count1;
+    /* end = clock();
+    elapse = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("dnn1 time = %f  ", elapse); */
     // printf("  count1  %d , dnn1  %f \n", count1, dnn1);
 
 
     /* from the 2nd image */
+    // start = clock();
     count2 = 0;
     dnn2 = 0.0;
-    // minInit = 4.0;
+    // minInit = 40.0;
     for (y2 = margin ; y2 < ROW - margin ; y2++) {
         for (x2 = margin ; x2 < COL - margin ; x2++) {
-        	if (sHoG2[y2 - margin][x2 - margin] == -1) continue;
-            angcode = sHoG2Idx(sHoG2[y2 - margin][x2 - margin]);
+            if (sHoG2[y2 - margin][x2 - margin] == -1) continue;
             count2++;
             min = minInit;
-            for (y1 = 0 ; y1 < (2 * ROW - 1) * (2 * COL - 1) ; y1++) {
-            // for (y1 = 0 ; y1 < 50 ; y1++) {
+            for (y1 = 0 ; y1 < TRUNC ; y1++) {
                 if (y2 + coor[y1][0] < margin || y2 + coor[y1][0] >= ROW - margin || x2 + coor[y1][1] < margin || x2 + coor[y1][1] >= COL - margin ) continue;
-                if (sHoG2Idx(sHoG1[y2 + coor[y1][0] - margin][x2 + coor[y1][1] - margin]) != angcode) continue;
+                if (sHoG1[y2 + coor[y1][0] - margin][x2 + coor[y1][1] - margin] != sHoG2[y2 - margin][x2 - margin]) continue;
                 // if (ndis[y1] > minInit) break;
                 delta = ndis[y1];
                 // printf("y1 = %d nn1 = %f \n", y1, ndis[y1]);
                 if (delta < min) min = delta;
+                // printf("y1 = %d\n", y1);
                 break;
             }
             dnn2 += min;
         }
     }
     dnn2 /= (double)count2;
+    /* end = clock();
+    elapse = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("dnn2 time = %f\n", elapse); */
     // printf("  count2  %d , dnn2  %f  \n", count2, dnn2);
 
     // printf("Gauss parameter %f  %f  \n", dnn1, dnn2);

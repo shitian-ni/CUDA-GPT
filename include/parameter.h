@@ -106,6 +106,7 @@
 #define SHoGTHRE        300.0   // The first direction should over this value
 #define SHoGSECONDTHRE	0.5		// The threshold of the second direction of the simplified HoG pattern
 #define DNNSWITCHTHRE	2.0		// The threshold of switch the method of dnn calculation
+#define TRUNC			(2 * COL - 1) * (2 * ROW - 1)
 #define PI 3.141592654			// value of pi
 #define EPS 0.000001         	// like zero
 #define EPS2 0.000001           // like zero2
