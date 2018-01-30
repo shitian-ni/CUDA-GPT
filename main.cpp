@@ -90,11 +90,7 @@ int main() {
     loadTemp64_far(H3);
 #endif
 
-    init_gk_and_g_can2(gk,g_can2);
-
-    init_H1(H1);
-    init_H2(H2);
-    init_H3(H3);
+    copy_initial_parameters(gk,g_can2,H1,H2,H3,D1,D2,sHoG2,ndis, coor);
 
 
 	/* Load test image and save it to image3, the local memory */
