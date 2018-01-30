@@ -766,7 +766,9 @@ __global__ void cuda_global_fsHoGpat() {
 	sdata_int[1][tid]=condition2; 
 
 	double min_1 = condition1*minInit;
-    double delta_1 = condition1 * d_D2[y - margin][x - margin + (COL - 2 * margin) * angcode];
+    double delta_1 = 0;
+    if(condition1)
+    	delta_1 = d_D2[y - margin][x - margin + (COL - 2 * margin) * angcode];
 
     min_1 = min(min_1,delta_1);
     
@@ -788,9 +790,9 @@ __global__ void cuda_global_fsHoGpat() {
 
     sdata_double[0][tid] = min_1;
     sdata_double[1][tid] = min_2;
-    if(x==30&&y==60)
-    printf("%d %d %.5f %.5f\n",x,y,min_1,min_2);
+    
     __syncthreads(); 
+
 	customAdd(sdata_int[0],d_cuda_global_fsHoGpat_count);
 	customAdd(sdata_int[1],d_cuda_global_fsHoGpat_count+1);
 	customAdd(sdata_double[0],d_cuda_global_fsHoGpat_dnn);
@@ -811,7 +813,6 @@ double cuda_fsHoGpat(char sHoG1[ROW - 4][COL - 4]){
 	double cuda_global_fsHoGpat_dnn[2];
 	cudaMemcpy(cuda_global_fsHoGpat_count, d_cuda_global_fsHoGpat_count_ptr, 2*sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(cuda_global_fsHoGpat_dnn, d_cuda_global_fsHoGpat_dnn_ptr, 2*sizeof(double), cudaMemcpyDeviceToHost);
-	cout<<cuda_global_fsHoGpat_dnn[0]<<" "<<cuda_global_fsHoGpat_count[0]<<" "<<cuda_global_fsHoGpat_dnn[1]<<" "<<cuda_global_fsHoGpat_count[1]<<" "<<endl;
 	double dnn1 = cuda_global_fsHoGpat_dnn[0] / cuda_global_fsHoGpat_count[0];
 	double dnn2 = cuda_global_fsHoGpat_dnn[1] / cuda_global_fsHoGpat_count[1];
     return (dnn1 + dnn2)/2.0;
