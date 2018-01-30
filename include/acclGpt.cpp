@@ -713,7 +713,7 @@ void fnsgptcor(int g_ang1[ROW][COL], double g_can1[ROW][COL], double gpt[3][3], 
 	/* Linear interpolation */
     if(isGPU){
         // cuda_update_parameter(sHoG1);
-        cuda_Ht(newVar,1,1);
+        cuda_Ht(newVar,1);
         g = cuda_calc_g(1);
     } else {
 
@@ -981,7 +981,7 @@ void fnsgptcorSpHOG5x5(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], doubl
 
     if(isGPU){
         cuda_update_parameter(sHoG1);
-        cuda_Ht(newVar,1,2);
+        cuda_Ht(newVar,2);
         g = cuda_calc_g(2);
     } else {
         if (newVar > 1.0) {
@@ -1254,7 +1254,7 @@ void fnsgptcorSpHOG5x5_far(int g_ang1[ROW][COL], char sHoG1[ROW - 4][COL - 4], d
 
     if(isGPU){
         cuda_update_parameter(sHoG1);
-        cuda_Ht(newVar,2,3);
+        cuda_Ht(newVar,3);
         g = cuda_calc_g(3);
     } else {
     	if (newVar > var[5]) {

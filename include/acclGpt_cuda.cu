@@ -57,14 +57,14 @@ __global__ void Ht1_2() {
 
     d_Ht1[y][x] =  d_H1[y][x];   
 };
-__global__ void Ht1_3(int count, double newVar, int VarTableNo) {
+__global__ void Ht1_3(int count, double newVar) {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW_H1) || (x >= COL_Ht1)) {
         return;
     }
-    double var_p_1 = pow(2.0,count + 1 -5 - (VarTableNo-1)*5) ;
-    double var = var_p_1 / 2.0;
+    double var = pow(2.0,count -5) ;
+    double var_p_1 = var * 2.0;
     d_Ht1[y][x] =  d_H1[y][x + COL * 27 * count] + (d_H1[y][x + COL * 27 * (count + 1)] - d_H1[y][x + COL * 27 * count]) 
     / (var_p_1 - var) * (newVar - var);                
 };
@@ -89,15 +89,15 @@ __global__ void Ht2_2() {
 
     d_Ht2[y][x] =  d_H2[y][x];   
 };
-__global__ void Ht2_3(int count, double newVar, int VarTableNo) {
+__global__ void Ht2_3(int count, double newVar) {
 	int margin = 2;
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW - 2 * margin) || (x >= 3 * 64 * (COL - 2 * margin))) {
         return;
     }
-    double var_p_1 = pow(2.0,count + 1 -5) ;
-    double var = var_p_1 / 2.0;
+    double var = pow(2.0,count -5) ;
+    double var_p_1 = var * 2.0;
     d_Ht2[y][x] = d_H2[y][x + (COL - 2 * margin) * 3 * 64 * count] +
                                    (d_H2[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H2[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var_p_1 - var)
@@ -124,15 +124,15 @@ __global__ void Ht3_2() {
 
     d_Ht3[y][x] =  d_H3[y][x];   
 };
-__global__ void Ht3_3(int count, double newVar, int VarTableNo) {
+__global__ void Ht3_3(int count, double newVar) {
 	int margin = 2;
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int y = blockIdx.y*blockDim.y + threadIdx.y;
     if ((y >= ROW - 2 * margin) || (x >= 3 * 64 * (COL - 2 * margin))) {
         return;
     }
-    double var_p_1 = pow(2.0,count + 1 -5 - (VarTableNo-1)*5) ;
-    double var = var_p_1 / 2.0;
+    double var = pow(2.0,count - 10) ;
+    double var_p_1 = var * 2.0;
     d_Ht3[y][x] = d_H3[y][x + (COL - 2 * margin) * 3 * 64 * count] +
                                    (d_H3[y][x + (COL - 2 * margin) * 3 * 64 * (count + 1)] - d_H3[y][x + (COL - 2 * margin) * 3 * 64 * count])
                                  / (var_p_1 - var)
@@ -162,55 +162,19 @@ __device__ void customAdd(T* sdata,T* g_odata){
 	if (tid == 0) {atomicAdd(g_odata        , sdata[tid]);}
 
 }
-__global__ void weightedAVG(int calc_g_type) {
 
-	// __shared__ double sdata[TPB_X_TPB];
+__device__ void weightedAVG_Add(double t0, double tx2,double ty2){
+
 	__shared__ double sdata[6][TPB_X_TPB];
-
-    int x1 = blockIdx.x*blockDim.x + threadIdx.x;
-    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
-    int tx = threadIdx.x;
+	int tx = threadIdx.x;
     int ty = threadIdx.y;
     int tid = ty * blockDim.x + tx;
-
-    int margin = 2;
-
-    double sHoGnumber[64] = sHoGNUMBER;
-	double dx1=x1 - CX;
+    int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+    double dx1=x1 - CX;
 	double dy1=y1 - CY;
-	bool condition = ((y1 >= margin) && (x1 >= margin) && (y1 < ROW-margin) && (x1 < COL-margin) && d_sHoG1[y1 - margin][x1 - margin] != -1);
-	double t0 = 0;
-	double tx2 = 0;
-	double ty2 = 0;
-	int thre = -1;
 
-	if(calc_g_type == 0){
-		if (d_g_ang1[y1][x1] == -1) return;
-    	thre = (d_g_ang1[y1][x1] + 1) * 3 * COL;
-	} else {
-		for (int s = 0 ; condition && s < 64 ; s++) {
-	        if (d_sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
-	            thre = s * 3 * (COL - 2 * margin);
-	            if(calc_g_type == 2){
-	            	t0     = d_Ht2[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
-				    tx2    = d_Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * d_g_can1[y1][x1];
-				    ty2    = d_Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
-
-	            }
-	            if(calc_g_type == 3){
-	            	t0     = d_Ht3[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
-				    tx2    = d_Ht3[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * d_g_can1[y1][x1];
-				    ty2    = d_Ht3[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
-
-	            }
-	            
-	            break;
-	        }
-	    }
-	    
-	}
-
-    sdata[0][tid]=t0; 
+	sdata[0][tid]=t0; 
 	sdata[1][tid]=tx2; 
 	sdata[2][tid]=ty2; 
 	sdata[3][tid]=t0  * dx1;
@@ -278,6 +242,79 @@ __global__ void weightedAVG(int calc_g_type) {
 	__syncthreads(); 
 	customAdd(sdata[0],d_g+26); 
 	__syncthreads();  
+}
+__global__ void weightedAVG_1() {
+
+    int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+
+	bool condition = ((y1 >= MARGINE) && (x1 >= MARGINE) && (y1 < ROW-MARGINE) && (x1 < COL-MARGINE) && d_g_ang1[y1][x1] != -1);
+	double t0 = 0;
+	double tx2 = 0;
+	double ty2 = 0;
+	int thre = -1;
+	if(condition){
+		thre = (d_g_ang1[y1][x1] + 1) * 3 * COL;
+		t0     = d_Ht1[y1][thre + x1]                          * d_g_can1[y1][x1];
+	    tx2    = d_Ht1[y1][thre + x1 + COL]     * d_g_can1[y1][x1];
+	    ty2    = d_Ht1[y1][thre + x1 + COL * 2] * d_g_can1[y1][x1];
+	}
+	weightedAVG_Add(t0,  tx2, ty2);
+};
+
+__global__ void weightedAVG_2() {
+
+    int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+
+    int margin = 2;
+
+    double sHoGnumber[64] = sHoGNUMBER;
+
+	bool condition = ((y1 >= margin) && (x1 >= margin) && (y1 < ROW-margin) && (x1 < COL-margin) && d_sHoG1[y1 - margin][x1 - margin] != -1);
+	double t0 = 0;
+	double tx2 = 0;
+	double ty2 = 0;
+	int thre = -1;
+
+	for (int s = 0 ; condition && s < 64 ; s++) {
+        if (d_sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+            thre = s * 3 * (COL - 2 * margin);
+            t0     = d_Ht2[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
+		    tx2    = d_Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * d_g_can1[y1][x1];
+		    ty2    = d_Ht2[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
+            break;
+        }
+    }  
+	weightedAVG_Add(t0,  tx2, ty2);
+};
+
+__global__ void weightedAVG_3() {
+
+    int x1 = blockIdx.x*blockDim.x + threadIdx.x;
+    int y1 = blockIdx.y*blockDim.y + threadIdx.y;
+
+    int margin = 2;
+
+    double sHoGnumber[64] = sHoGNUMBER;
+
+	bool condition = ((y1 >= margin) && (x1 >= margin) && (y1 < ROW-margin) && (x1 < COL-margin) && d_sHoG1[y1 - margin][x1 - margin] != -1);
+	double t0 = 0;
+	double tx2 = 0;
+	double ty2 = 0;
+	int thre = -1;
+
+	for (int s = 0 ; condition && s < 64 ; s++) {
+        if (d_sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
+            thre = s * 3 * (COL - 2 * margin);
+            t0     = d_Ht3[y1 - margin][thre + x1 - margin]                          * d_g_can1[y1][x1];
+		    tx2    = d_Ht3[y1 - margin][thre + x1 - margin + (COL - 2 * margin)]     * d_g_can1[y1][x1];
+		    ty2    = d_Ht3[y1 - margin][thre + x1 - margin + (COL - 2 * margin) * 2] * d_g_can1[y1][x1];
+            
+            break;
+        }
+    }   
+	weightedAVG_Add(t0,  tx2, ty2);
 };
 
 __global__ void cuda_roberts8() {
@@ -537,9 +574,11 @@ void cuda_calc_defcan1(double g_can1[ROW][COL], unsigned char image1[MAX_IMAGESI
 int needH = 1;
 void cuda_update_parameter(char sHoG1[ROW - 4][COL - 4]){
 	cudaMemcpy(d_sHoG1_ptr, sHoG1, (ROW - 4)*(COL-4)*sizeof(char), cudaMemcpyHostToDevice);
+	// cudaMemcpy(d_g_ang1_ptr, g_ang1, (ROW )*(COL)*sizeof(int), cudaMemcpyHostToDevice);
+	// cudaMemcpy(d_g_can1_ptr, g_can1, (ROW )*(COL)*sizeof(double), cudaMemcpyHostToDevice);
 }
 
-void cuda_Ht(double newVar, int VarTableNo,int H_No){	
+void cuda_Ht(double newVar,int H_No){	
 	if(H_No == 1){
 		numBlock.x = iDivUp(COL_Ht1, TPB);
 		numBlock.y = iDivUp(ROW_H1, TPB);
@@ -549,7 +588,7 @@ void cuda_Ht(double newVar, int VarTableNo,int H_No){
 			Ht1_2<<<numBlock, numThread>>>();
 		} else {
 			int count = floor(log2(newVar)) + 5;
-			Ht1_3<<<numBlock, numThread>>>(count, newVar, VarTableNo);
+			Ht1_3<<<numBlock, numThread>>>(count, newVar);
 		}
 	} else if(H_No == 2){
 		numBlock.x = iDivUp(COL_Ht2, TPB);
@@ -560,7 +599,7 @@ void cuda_Ht(double newVar, int VarTableNo,int H_No){
 			Ht2_2<<<numBlock, numThread>>>();
 		} else {
 			int count = floor(log2(newVar)) + 5;
-			Ht2_3<<<numBlock, numThread>>>(count, newVar, VarTableNo);
+			Ht2_3<<<numBlock, numThread>>>(count, newVar);
 		}
 	} else if(H_No == 3){
 		numBlock.x = iDivUp(COL_Ht3, TPB);
@@ -572,16 +611,22 @@ void cuda_Ht(double newVar, int VarTableNo,int H_No){
 			Ht3_2<<<numBlock, numThread>>>();
 		} else {
 			int count = floor(log2(newVar)) + 10;
-			Ht3_3<<<numBlock, numThread>>>(count, newVar, VarTableNo);
+			Ht3_3<<<numBlock, numThread>>>(count, newVar);
 		}
 	} 
 }
 double* cuda_calc_g(int calc_g_type){
-	// cout<<"calc_g_type: "<<calc_g_type<<endl;
+	cout<<"calc_g_type: "<<calc_g_type<<endl;
 	cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double));
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
-	weightedAVG<<<numBlock, numThread>>>(calc_g_type);
+	if(calc_g_type == 1){
+		weightedAVG_1<<<numBlock, numThread>>>();
+	} else if(calc_g_type == 2){
+		weightedAVG_2<<<numBlock, numThread>>>();
+	} else if(calc_g_type == 3){
+		weightedAVG_3<<<numBlock, numThread>>>();
+	} 
 	cudaMemcpy(g, d_g_ptr, G_NUM*sizeof(double), cudaMemcpyDeviceToHost);
 	return g;
 }

@@ -33,7 +33,7 @@
  0: use CPU to calculate defcan, roberts8, calHoG, and smpHoG64
  1: use GPU to calculate defcan, roberts8, calHoG, and smpHoG64
  */
-#define isGPU 0
+#define isGPU 1
 
 /* CUDA parameters */
 #define TPB 32
@@ -95,7 +95,7 @@
 #define DISTANCETYPE 10
 
 /* Execute parameters */
-#define MAXITER 30				// Maximum iteration times
+#define MAXITER 1				// Maximum iteration times
 #define MAXNR 5					// Maximum Newton-Raphson iterations
 
 /* --------------Fixed parameters-------------- */
@@ -105,7 +105,7 @@
 #define NOHoG			8		// The threshold of non HoG feature
 #define SHoGTHRE        300.0   // The first direction should over this value
 #define SHoGSECONDTHRE	0.5		// The threshold of the second direction of the simplified HoG pattern
-#define DNNSWITCHTHRE	3.0		// The threshold of switch the method of dnn calculation
+#define DNNSWITCHTHRE	2.0		// The threshold of switch the method of dnn calculation
 #define PI 3.141592654			// value of pi
 #define EPS 0.000001         	// like zero
 #define EPS2 0.000001           // like zero2
@@ -123,11 +123,11 @@
 
 /* initial conditions */
 #define NONELEMENT				/* use non-elemental matrix as initial condition */
-#define ZOOM			0.7		/* Zoom rate for initial matrix */
-#define BETA			2.0		/* Relation between alpha and beta */
-#define ROT				-45.0		/* Rotation angle for initial matrix */
+#define ZOOM			1.7		/* Zoom rate for initial matrix */
+#define BETA			1.0		/* Relation between alpha and beta */
+#define ROT				0.0		/* Rotation angle for initial matrix */
 #define B1				0.0		/*  */
-#define B2				20.0		/*  */
+#define B2				0.0		/*  */
 
 /* information of window sizes and ID of simplified HOG patterns */
 #define VARTABLE  {1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0 / 2, 1.0};
@@ -153,7 +153,7 @@
  3: GRAF        // 20, 400, 0.5
  4: WALL
  */
-#define DATATYPE 3
+#define DATATYPE 2
 
 #if DATATYPE == 1
 #define COL 28          		/* Horizontal size of image  */
@@ -178,7 +178,7 @@
 
 #define MARGINE 0				/* Margine size              */
 #define CANMARGIN 0			/* Margine size for calculate crr */
-#define TsIMAGE  "sample_boat/img6_small2"
+#define TsIMAGE  "sample_boat/img2_small2"
 #define RgIMAGE  "sample_boat/img1_small"
 #define CENTERCORRELATION
 /* acc: 3.5,
