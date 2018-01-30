@@ -577,6 +577,9 @@ void cuda_update_parameter(char sHoG1[ROW - 4][COL - 4]){
 	// cudaMemcpy(d_g_ang1_ptr, g_ang1, (ROW )*(COL)*sizeof(int), cudaMemcpyHostToDevice);
 	// cudaMemcpy(d_g_can1_ptr, g_can1, (ROW )*(COL)*sizeof(double), cudaMemcpyHostToDevice);
 }
+void cuda_update_image(unsigned char image1[MAX_IMAGESIZE][MAX_IMAGESIZE]){
+	cudaMemcpy(d_image1_ptr, image1, MAX_IMAGESIZE*MAX_IMAGESIZE*sizeof(unsigned char), cudaMemcpyHostToDevice);
+}
 
 void cuda_Ht(double newVar,int H_No){	
 	if(H_No == 1){
@@ -616,7 +619,7 @@ void cuda_Ht(double newVar,int H_No){
 	} 
 }
 double* cuda_calc_g(int calc_g_type){
-	cout<<"calc_g_type: "<<calc_g_type<<endl;
+	// cout<<"calc_g_type: "<<calc_g_type<<endl;
 	cudaMemset(d_g_ptr, 0, G_NUM * sizeof(double));
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);

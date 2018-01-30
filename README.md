@@ -14,6 +14,11 @@ Tested on Tokyo Tech TSUBAME 3.0
 Modify `#define MAKETEMP 0`to `#define MAKETEMP 1` for table generations. Compile and execute.
 Then change back to `#define MAKETEMP 0`.
 
+## Known issues
+
+### minor result difference between CPU and GPU
+- Could be CPU precision error in multiplyVect3x3 used in bilinear_normal_projection function in stdGpt.cpp
+
 ## Reference
 ```
     @inproceedings{

@@ -442,6 +442,15 @@ void bilinear_normal_projection(double gpt[3][3], int x_size1, int y_size1, int 
 		bilinear_normal_inverse_projection(inv_gpt, x_size1, y_size1, x_size2, y_size2, image1, image2);
 	#elif isGPU == 1
 		cuda_bilinear_normal_inverse_projection(inv_gpt, x_size1, y_size1, x_size2, y_size2, image1, image2);
+
+		/*
+		Change cuda_bilinear_normal_inverse_projection to following to line to clear minor CPU and GPU new col. difference.
+		~0.04 sec calculation time difference
+		Could be CPU multiplyVect3x3(gpt, inVect, outVect); precision error.
+
+		bilinear_normal_inverse_projection(inv_gpt, x_size1, y_size1, x_size2, y_size2, image1, image2);
+		cuda_update_image(image2);
+		*/
 	#endif
 }
 
