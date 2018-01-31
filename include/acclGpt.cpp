@@ -555,76 +555,84 @@ void loadTemp64_far(double H[ROW - 4][(COL - 4) * 6 * 64 * 3]) {
 }
 
 double fwinpat(int g_ang1[ROW][COL], int g_ang2[ROW][COL], double D[ROW][COL * 8], double ndis[(2 * ROW - 1) * (2 * COL - 1)], int coor[(2 * ROW - 1) * (2 * COL - 1)][2]) {
-    /* calculation of mean of nearest-neighbor interpoint distances */
-    /* with the same angle code between two images */
-    double min, minInit, delta, dnn1, dnn2;
-    int x1, y1, x2, y2;
-    int angcode;
-    int count1, count2;
-    int margine = 4;
     
-    minInit = sqrt((ROW - 2 * margine) * (ROW - 2 * margine) + (COL - 2 * margine) * (COL - 2 * margine));
-    /* from the 1st image */
-    count1 = 0;
-    dnn1 = 0.0;
-    for (y1 = MARGINE ; y1 < ROW - MARGINE; y1++) {
-        for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
-            angcode = g_ang1[y1][x1];
-            if (angcode == -1) continue;
-            count1++;
-            min = minInit;
-            /*
-             for (y2 = MARGINE ; y2 < ROW - MARGINE ; y2++) {
-             for (x2 = MARGINE ; x2 < COL - MARGINE ; x2++) {
-             if (g_ang2[y2][x2] != angcode) continue;
-             delta = (y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1);
-             if (delta < min) min = delta;
-             }
-             }
-             */
-            delta = D[y1][x1 + COL * angcode];
-            if (delta < min) min = delta;
-            // printf("angCode = %d, (%d, %d) nn1 = %f \n", angcode, x1, y1, min);
-            dnn1 += min;
-        }
-    }
-    dnn1 /= (double)count1;
-    // printf("  count1  %d  ", count1);
-    
-    /* from the 2nd image */
-    count2 = 0;
-    dnn2 = 0.0;
-    for (y2 = MARGINE ; y2 < ROW - MARGINE ; y2++) {
-        for (x2 = MARGINE ; x2 < COL - MARGINE ; x2++) {
-            angcode = g_ang2[y2][x2];
-            if (angcode == -1) continue;
-            count2++;
-            min = minInit;
-            /*
-             for (y1 = MARGINE ; y1 < ROW - MARGINE ; y1++) {
-             for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
-             if (g_ang1[y1][x1] != angcode) continue;
-             delta = (y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1);
-             if (delta < min) min = delta;
-             }
-             }
-             */
-            for (y1 = 0 ; y1 < (2 * ROW - 1) * (2 * COL - 1) ; y1++) {
-                if (y2 + coor[y1][0] < 0 || y2 + coor[y1][0] >= ROW || x2 + coor[y1][1] < 0 || x2 + coor[y1][1] >= COL ) continue;
-                if (g_ang1[y2 + coor[y1][0]][x2 + coor[y1][1]] != angcode) continue;
-                delta = ndis[y1];
-                // printf("y1 = %d nn1 = %f \n", y1, ndis[y1]);
+    if(isGPU){
+        return cuda_fwinpat(g_ang2);
+    } else {
+        /* calculation of mean of nearest-neighbor interpoint distances */
+        /* with the same angle code between two images */
+        double min, minInit, delta, dnn1, dnn2;
+        int x1, y1, x2, y2;
+        int angcode;
+        int count1, count2;
+        int margine = 4;
+        
+        minInit = sqrt((ROW - 2 * margine) * (ROW - 2 * margine) + (COL - 2 * margine) * (COL - 2 * margine));
+        /* from the 1st image */
+        count1 = 0;
+        dnn1 = 0.0;
+        for (y1 = MARGINE ; y1 < ROW - MARGINE; y1++) {
+            for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
+                // if(x1==30 && y1==60){
+                //     printf("%d %d\n", g_ang1[y1][x1],g_ang2[y1][x1]);
+                // }
+                angcode = g_ang1[y1][x1];
+                if (angcode == -1) continue;
+                count1++;
+                min = minInit;
+                /*
+                 for (y2 = MARGINE ; y2 < ROW - MARGINE ; y2++) {
+                 for (x2 = MARGINE ; x2 < COL - MARGINE ; x2++) {
+                 if (g_ang2[y2][x2] != angcode) continue;
+                 delta = (y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1);
+                 if (delta < min) min = delta;
+                 }
+                 }
+                 */
+                delta = D[y1][x1 + COL * angcode];
                 if (delta < min) min = delta;
-                break;
+                // printf("angCode = %d, (%d, %d) nn1 = %f \n", angcode, x1, y1, min);
+                dnn1 += min;
             }
-            dnn2 += min;
         }
+        dnn1 /= (double)count1;
+        // printf("  count1  %d  ", count1);
+        
+        /* from the 2nd image */
+        count2 = 0;
+        dnn2 = 0.0;
+        for (y2 = MARGINE ; y2 < ROW - MARGINE ; y2++) {
+            for (x2 = MARGINE ; x2 < COL - MARGINE ; x2++) {
+                angcode = g_ang2[y2][x2];
+                if (angcode == -1) continue;
+                count2++;
+                min = minInit;
+                /*
+                 for (y1 = MARGINE ; y1 < ROW - MARGINE ; y1++) {
+                 for (x1 = MARGINE ; x1 < COL - MARGINE ; x1++) {
+                 if (g_ang1[y1][x1] != angcode) continue;
+                 delta = (y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1);
+                 if (delta < min) min = delta;
+                 }
+                 }
+                 */
+                for (y1 = 0 ; y1 < (2 * ROW - 1) * (2 * COL - 1) ; y1++) {
+                    if (y2 + coor[y1][0] < 0 || y2 + coor[y1][0] >= ROW || x2 + coor[y1][1] < 0 || x2 + coor[y1][1] >= COL ) continue;
+                    if (g_ang1[y2 + coor[y1][0]][x2 + coor[y1][1]] != angcode) continue;
+                    delta = ndis[y1];
+                    // printf("y1 = %d nn1 = %f \n", y1, ndis[y1]);
+                    if (delta < min) min = delta;
+                    break;
+                }
+                dnn2 += min;
+            }
+        }
+        dnn2 /= (double)count2;
+        // printf("  count2  %d  ", count2);
+        
+        /* printf("Gauss parameter %f  %f  \n", dnn1, dnn2); */
+        return (dnn1 + dnn2)/2.0;
     }
-    dnn2 /= (double)count2;
-    // printf("  count2  %d  ", count2);
-    
-    /* printf("Gauss parameter %f  %f  \n", dnn1, dnn2); */
-    return (dnn1 + dnn2)/2.0;
 }
 
 double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], double D[ROW - 4][(COL - 4) * 64], double ndis[(2 * ROW - 1) * (2 * COL - 1)], int coor[(2 * ROW - 1) * (2 * COL - 1)][2]) {
@@ -650,9 +658,7 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
         dnn1 = 0.0;
         for (y1 = margin ; y1 < ROW - margin; y1++) {
             for (x1 = margin ; x1 < COL - margin ; x1++) {
-                if(x1==30&&y1==60)
-                    printf("sHoG1[y1 - margin][x1 - margin]: %d\n",sHoG1[y1 - margin][x1 - margin]);
-                    // cout<<"sHoG1[y1 - margin][x1 - margin]: "<<sHoG1[y1 - margin][x1 - margin]<<endl;
+                
                 if (sHoG1[y1 - margin][x1 - margin] == -1) continue;
                 for (s = 0 ; s < 64 ; s++) {
                     if (sHoG1[y1 - margin][x1 - margin] == sHoGnumber[s]) {
@@ -667,9 +673,7 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
                 if (delta < min) min = delta;
                 // printf("angCode = %d, (%d, %d) nn1 = %f (%d)\n", angcode, x1, y1, min, sHoG1[y1 - margin][x1 - margin]);
                 dnn1 += min;
-                if(x1==30&&y1==60)
-    //printf("%d %d %.5f %.5f\n",x,y,min_1,min_2);
-                cout<<"min1: "<<min<<endl;
+
                 // printf("angCode = %d, (%d, %d) nn1 = %f (%d) \n", angcode, x1, y1, dnn1, sHoGnum);
             }
         }
@@ -700,9 +704,7 @@ double fsHoGpat(char sHoG1[ROW - 4][COL - 4], char sHoG2[ROW - 4][COL - 4], doub
                     // printf("y1 = %d\n", y1);
                     break;
                 }
-                if(x2==30&&y2==60)
-    // printf("%d %d %.5f %.5f\n",x,y,min_1,min_2);
-                cout<<"min2: "<<min<<endl;
+
                 dnn2 += min;
             }
         }

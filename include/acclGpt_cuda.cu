@@ -19,6 +19,7 @@ __device__ unsigned char d_image1[MAX_IMAGESIZE][MAX_IMAGESIZE];
 __device__ unsigned char d_image2[MAX_IMAGESIZE][MAX_IMAGESIZE];
 __device__ double d_g[G_NUM], d_g_can1[ROW][COL], d_g_nor1[ROW][COL], d_gk[ROW][COL], d_gwt[ROW][COL],d_g_can2[ROW][COL];
 __device__ int d_g_ang1[ROW][COL];
+__device__ int d_g_ang2[ROW][COL];
 __device__ char d_sHoG1[ROW - 4][COL - 4];
 __device__ char d_sHoG2[ROW - 4][COL - 4];
 __device__ double d_new_cor;
@@ -29,6 +30,8 @@ __device__ double d_ndis[(2 * ROW - 1) * (2 * COL - 1)];
 __device__ int d_coor[(2 * ROW - 1) * (2 * COL - 1)][2];
 __device__ int d_cuda_global_fsHoGpat_count[2];
 __device__ double d_cuda_global_fsHoGpat_dnn[2];
+__device__ int d_cuda_global_fwinpat_count[2];
+__device__ double d_cuda_global_fwinpat_dnn[2];
 
 
 int iDivUp(int hostPtr, int b){ return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); };
@@ -442,7 +445,7 @@ void* d_H1_ptr;void*  d_Ht1_ptr;
 void* d_H2_ptr;void*  d_Ht2_ptr;
 void* d_H3_ptr;void*  d_Ht3_ptr;
 void*  d_g_ptr;
-void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;void* d_sHoG1_ptr;void* d_sHoG2_ptr;
+void*  d_g_can1_ptr;void*  d_g_nor1_ptr;void*  d_g_ang1_ptr;void*  d_g_ang2_ptr;void* d_sHoG1_ptr;void* d_sHoG2_ptr;
 void* d_cuda_defcan_vars_ptr;
 void* d_gk_ptr;void* d_gwt_ptr;void* d_g_can2_ptr;
 void* d_new_cor_ptr;
@@ -451,6 +454,8 @@ void* d_D1_ptr;void* d_D2_ptr;
 void* d_ndis_ptr; void* d_coor_ptr;
 void* d_cuda_global_fsHoGpat_count_ptr;
 void* d_cuda_global_fsHoGpat_dnn_ptr;
+void* d_cuda_global_fwinpat_count_ptr;
+void* d_cuda_global_fwinpat_dnn_ptr;
 
 double g[G_NUM];
 int procImg_No = 1;
@@ -473,6 +478,8 @@ void cuda_init_parameter(){
 
 	gpuErrchk( cudaGetSymbolAddress(&d_cuda_global_fsHoGpat_count_ptr,d_cuda_global_fsHoGpat_count));
 	gpuErrchk( cudaGetSymbolAddress(&d_cuda_global_fsHoGpat_dnn_ptr,d_cuda_global_fsHoGpat_dnn));
+	gpuErrchk( cudaGetSymbolAddress(&d_cuda_global_fwinpat_count_ptr,d_cuda_global_fwinpat_count));
+	gpuErrchk( cudaGetSymbolAddress(&d_cuda_global_fwinpat_dnn_ptr,d_cuda_global_fwinpat_dnn));
 
 	gpuErrchk( cudaGetSymbolAddress(&d_H1_ptr,d_H1));
 	gpuErrchk( cudaGetSymbolAddress(&d_Ht1_ptr,d_Ht1));
@@ -486,6 +493,7 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaGetSymbolAddress(&d_g_can1_ptr,d_g_can1));
 	gpuErrchk( cudaGetSymbolAddress(&d_g_nor1_ptr,d_g_nor1));
 	gpuErrchk( cudaGetSymbolAddress(&d_g_ang1_ptr,d_g_ang1));
+	gpuErrchk( cudaGetSymbolAddress(&d_g_ang2_ptr,d_g_ang2));
 	gpuErrchk( cudaGetSymbolAddress(&d_cuda_defcan_vars_ptr,d_cuda_defcan_vars));
 	gpuErrchk( cudaGetSymbolAddress(&d_gk_ptr,d_gk));
 	gpuErrchk( cudaGetSymbolAddress(&d_gwt_ptr,d_gwt));
@@ -498,11 +506,12 @@ void cuda_init_parameter(){
 	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
 }
 
-void copy_initial_parameters(double gk[ROW][COL],double g_can2[ROW][COL],double H1[ROW_H1][COL_H1],double H2[ROW_H2][COL_H2],double H3[ROW_H3][COL_H3],
+void copy_initial_parameters(double gk[ROW][COL],double g_can2[ROW][COL],int g_ang2[ROW][COL],double H1[ROW_H1][COL_H1],double H2[ROW_H2][COL_H2],double H3[ROW_H3][COL_H3],
 	double D1[ROW][COL * 8], double D2[ROW - 4][(COL - 4) * 64],char sHoG2[ROW - 4][COL - 4],double ndis[(2 * ROW - 1) * (2 * COL - 1)],
 int coor[(2 * ROW - 1) * (2 * COL - 1)][2]){
 	cudaMemcpy(d_gk_ptr, gk, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_g_can2_ptr, g_can2, ROW * COL * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_g_ang2_ptr, g_ang2, ROW * COL * sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_H1_ptr, H1, ROW_H1*COL_H1*sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_H2_ptr, H2, ROW_H2*COL_H2*sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_H3_ptr, H3, ROW_H3*COL_H3*sizeof(double), cudaMemcpyHostToDevice);
@@ -815,5 +824,85 @@ double cuda_fsHoGpat(char sHoG1[ROW - 4][COL - 4]){
 	cudaMemcpy(cuda_global_fsHoGpat_dnn, d_cuda_global_fsHoGpat_dnn_ptr, 2*sizeof(double), cudaMemcpyDeviceToHost);
 	double dnn1 = cuda_global_fsHoGpat_dnn[0] / cuda_global_fsHoGpat_count[0];
 	double dnn2 = cuda_global_fsHoGpat_dnn[1] / cuda_global_fsHoGpat_count[1];
+    return (dnn1 + dnn2)/2.0;
+}
+
+
+__global__ void cuda_global_fwinpat() {
+	int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int tid = ty * blockDim.x + tx;
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+    int y = blockIdx.y*blockDim.y + threadIdx.y;
+    // if ((y >= ROW) || (x >= COL)) {
+    //     return;
+    // }
+    // if(x==30 && y==60){
+    // 	printf("%d %d\n", d_g_ang1[y][x],d_g_ang2[y][x]);
+    // }
+  	int margine = 4;
+    double minInit = sqrt((double)((ROW - 2 * margine) * (ROW - 2 * margine) + (COL - 2 * margine) * (COL - 2 * margine)));
+
+    bool condition1 = ((y >= MARGINE) && (x >= MARGINE) && (y < ROW-MARGINE) && (x < COL-MARGINE) && d_g_ang1[y - MARGINE][x - MARGINE] != -1);
+    bool condition2 = ((y >= MARGINE) && (x >= MARGINE) && (y < ROW-MARGINE) && (x < COL-MARGINE) && d_g_ang2[y - MARGINE][x - MARGINE] != -1);
+    int angcode1 = 0;
+    if(condition1)angcode1 = d_g_ang1[y][x];
+
+	__shared__ int sdata_int[2][TPB_X_TPB];
+	__shared__ double sdata_double[2][TPB_X_TPB];
+
+	sdata_int[0][tid]=condition1; 
+	sdata_int[1][tid]=condition2; 
+
+	double min_1 = condition1*minInit;
+    double delta_1 = 0;
+    if(condition1)
+    	delta_1 = d_D1[y][x + COL * angcode1];
+
+    min_1 = min(min_1,delta_1);
+    
+
+    double delta_2 = condition2;
+    double min_2 = condition2*minInit;
+    int angcode2 = 0;
+    if(condition2)angcode2 = d_g_ang2[y][x];
+    for (int y1 = 0 ; condition2 && y1 < (2 * ROW - 1) * (2 * COL - 1) ; y1++) {
+        if (y + d_coor[y1][0] < 0 || y + d_coor[y1][0] >= ROW || x + d_coor[y1][1] < 0 || x + d_coor[y1][1] >= COL ) continue;
+        if (d_g_ang1[y + d_coor[y1][0]][x + d_coor[y1][1]] != angcode2) continue;
+        delta_2 = d_ndis[y1];
+        // printf("y1 = %d nn1 = %f \n", y1, ndis[y1]);
+        if (delta_2 < min_2) min_2 = delta_2;
+        break;
+    }
+
+    sdata_double[0][tid] = min_1;
+    sdata_double[1][tid] = min_2;
+    
+    __syncthreads(); 
+
+	customAdd(sdata_int[0],d_cuda_global_fwinpat_count);
+	customAdd(sdata_int[1],d_cuda_global_fwinpat_count+1);
+	customAdd(sdata_double[0],d_cuda_global_fwinpat_dnn);
+	customAdd(sdata_double[1],d_cuda_global_fwinpat_dnn+1);
+}
+
+double cuda_fwinpat(int g_ang2[ROW][COL]){
+	numBlock.x = iDivUp(COL, TPB);
+	numBlock.y = iDivUp(ROW, TPB);
+	cudaMemset(d_cuda_global_fwinpat_dnn_ptr,0,2*sizeof(double));
+	cudaMemset(d_cuda_global_fwinpat_count_ptr,0,2*sizeof(int));
+	// cudaMemcpy(d_g_ang2_ptr,g_ang2,(ROW)*(COL)*sizeof(int),cudaMemcpyHostToDevice);
+
+	cuda_global_fwinpat<<<numBlock, numThread>>>();
+	gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaThreadSynchronize() ); // Checks for execution error
+	gpuErrchk( cudaPeekAtLastError() ); // Checks for launch error
+
+	int cuda_global_fwinpat_count[2];
+	double cuda_global_fwinpat_dnn[2];
+	cudaMemcpy(cuda_global_fwinpat_count, d_cuda_global_fwinpat_count_ptr, 2*sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(cuda_global_fwinpat_dnn, d_cuda_global_fwinpat_dnn_ptr, 2*sizeof(double), cudaMemcpyDeviceToHost);
+	double dnn1 = cuda_global_fwinpat_dnn[0] / cuda_global_fwinpat_count[0];
+	double dnn2 = cuda_global_fwinpat_dnn[1] / cuda_global_fwinpat_count[1];
     return (dnn1 + dnn2)/2.0;
 }
