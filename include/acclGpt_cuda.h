@@ -10,7 +10,7 @@ void copy_initial_parameters(double gk[ROW][COL],double g_can2[ROW][COL],int g_a
 int coor[(2 * ROW - 1) * (2 * COL - 1)][2]);
 
 double cuda_fsHoGpat(char sHoG1[ROW - 4][COL - 4]);
-double cuda_fwinpat(int g_ang2[ROW][COL]);
+double cuda_fwinpat();
 
 void calc_gwt(double var,double gwt[ROW][COL]);
 double calc_new_cor1();

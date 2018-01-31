@@ -557,7 +557,7 @@ void loadTemp64_far(double H[ROW - 4][(COL - 4) * 6 * 64 * 3]) {
 double fwinpat(int g_ang1[ROW][COL], int g_ang2[ROW][COL], double D[ROW][COL * 8], double ndis[(2 * ROW - 1) * (2 * COL - 1)], int coor[(2 * ROW - 1) * (2 * COL - 1)][2]) {
     
     if(isGPU){
-        return cuda_fwinpat(g_ang2);
+        return cuda_fwinpat();
     } else {
         /* calculation of mean of nearest-neighbor interpoint distances */
         /* with the same angle code between two images */

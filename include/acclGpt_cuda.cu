@@ -886,7 +886,7 @@ __global__ void cuda_global_fwinpat() {
 	customAdd(sdata_double[1],d_cuda_global_fwinpat_dnn+1);
 }
 
-double cuda_fwinpat(int g_ang2[ROW][COL]){
+double cuda_fwinpat(){
 	numBlock.x = iDivUp(COL, TPB);
 	numBlock.y = iDivUp(ROW, TPB);
 	cudaMemset(d_cuda_global_fwinpat_dnn_ptr,0,2*sizeof(double));
