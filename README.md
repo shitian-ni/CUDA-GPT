@@ -4,7 +4,7 @@
 
 ### Compile and Execute
 ```
-nvcc *.cpp include/*.c* -o cu.out  -arch=sm_60
+nvcc *.cpp include/*.c* -o cu.out  -arch=sm_60 --use_fast_math
 ```
 Tested on Tokyo Tech TSUBAME 3.0
  - Nvidia Tesla P100
